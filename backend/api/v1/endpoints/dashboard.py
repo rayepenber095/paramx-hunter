@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user
 from backend.database.models import (
-    Endpoint, Parameter, Scan, ScanStatus, User, RiskLevel
+    Endpoint, Parameter, Scan, ScanStatus, User
 )
 from backend.database.session import get_db
 
@@ -59,10 +59,10 @@ async def get_dashboard_stats(
         select(func.count(func.distinct(Parameter.name))).where(and_(*param_cond)) if param_cond
         else select(func.count(func.distinct(Parameter.name)))
     )).scalar_one()
-    hidden = await count(Parameter, Parameter.is_hidden == True, *param_cond)
-    sensitive = await count(Parameter, Parameter.is_sensitive == True, *param_cond)
-    apis = await count(Endpoint, Endpoint.is_api == True, *ep_cond)
-    websockets = await count(Endpoint, Endpoint.is_websocket == True, *ep_cond)
+    hidden = await count(Parameter, Parameter.is_hidden, *param_cond)
+    sensitive = await count(Parameter, Parameter.is_sensitive, *param_cond)
+    apis = await count(Endpoint, Endpoint.is_api, *ep_cond)
+    websockets = await count(Endpoint, Endpoint.is_websocket, *ep_cond)
     active_scans = await count(Scan, Scan.status == ScanStatus.RUNNING, *scan_cond)
     total_scans = await count(Scan, *scan_cond)
 

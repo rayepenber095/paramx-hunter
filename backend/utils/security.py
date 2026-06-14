@@ -5,8 +5,6 @@ and secrets management helpers.
 """
 
 import base64
-import json
-import os
 from functools import lru_cache
 
 from cryptography.fernet import Fernet, InvalidToken

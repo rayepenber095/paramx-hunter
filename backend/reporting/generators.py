@@ -3,7 +3,6 @@ ParamX Hunter - Report Generators
 PDF (ReportLab), HTML (Jinja2), Excel (openpyxl)
 """
 
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -201,7 +200,6 @@ async def generate_pdf_report(
     data = await _load_scan_data(db, scan_id)
     scan = data["scan"]
     params = data["parameters"]
-    endpoints = data["endpoints"]
     summary = data["summary"]
 
     doc = SimpleDocTemplate(output_path, pagesize=A4,
@@ -213,14 +211,6 @@ async def generate_pdf_report(
                                  fontName="Helvetica-Bold", spaceAfter=4)
     h2_style = ParagraphStyle("h2", fontSize=13, textColor=colors.HexColor("#94a3b8"),
                                fontName="Helvetica-Bold", spaceBefore=18, spaceAfter=8)
-
-    RISK_COLORS = {
-        "critical": colors.HexColor("#ef4444"),
-        "high": colors.HexColor("#f97316"),
-        "medium": colors.HexColor("#fbbf24"),
-        "low": colors.HexColor("#34d399"),
-        "info": colors.HexColor("#60a5fa"),
-    }
 
     story = []
     story.append(Paragraph("⚡ ParamX Hunter", title_style))
@@ -301,7 +291,7 @@ async def generate_excel_report(
 ) -> None:
     """Generate Excel report with multiple sheets."""
     import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Font, PatternFill, Alignment
     from openpyxl.utils import get_column_letter
 
     data = await _load_scan_data(db, scan_id)
@@ -309,15 +299,7 @@ async def generate_excel_report(
 
     HDR_FILL = PatternFill("solid", fgColor="07101C")
     HDR_FONT = Font(color="64748B", bold=True, name="Consolas", size=9)
-    CYAN_FONT = Font(color="06B6D4", name="Consolas", size=9)
     MONO_FONT = Font(name="Consolas", size=9)
-    RISK_FILLS = {
-        "critical": PatternFill("solid", fgColor="1A0505"),
-        "high": PatternFill("solid", fgColor="1A0A05"),
-        "medium": PatternFill("solid", fgColor="1A1505"),
-        "low": PatternFill("solid", fgColor="051A0A"),
-        "info": PatternFill("solid", fgColor="050A1A"),
-    }
 
     def add_sheet(name: str, headers: list[str], rows: list[list]) -> None:
         ws = wb.create_sheet(name)

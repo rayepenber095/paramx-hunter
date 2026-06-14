@@ -12,13 +12,13 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user
 from backend.config import settings
 from backend.database.models import (
-    Endpoint, Parameter, Scan, Target, User, RiskLevel
+    Endpoint, Parameter, Scan, User
 )
 from backend.database.session import get_db
 from backend.reporting.generators import (

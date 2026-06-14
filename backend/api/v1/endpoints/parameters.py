@@ -7,16 +7,15 @@ import csv
 import io
 import json
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user, require_roles
-from backend.database.models import Parameter, ParameterType, RiskLevel, User
+from backend.database.models import Parameter, RiskLevel, User
 from backend.database.session import get_db
 
 router = APIRouter()
@@ -177,14 +176,14 @@ async def get_parameter_stats(
     # Sensitive
     sensitive = (await db.execute(
         select(func.count()).where(
-            and_(Parameter.scan_id == scan_id, Parameter.is_sensitive == True)
+            and_(Parameter.scan_id == scan_id, Parameter.is_sensitive)
         )
     )).scalar_one()
 
     # Hidden
     hidden = (await db.execute(
         select(func.count()).where(
-            and_(Parameter.scan_id == scan_id, Parameter.is_hidden == True)
+            and_(Parameter.scan_id == scan_id, Parameter.is_hidden)
         )
     )).scalar_one()
 

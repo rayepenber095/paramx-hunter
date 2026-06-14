@@ -3,7 +3,6 @@ ParamX Hunter - Unit Tests: Parameter Extraction Engine
 """
 
 import json
-import pytest
 
 from backend.core.extractors import (
     URLExtractor,
@@ -15,7 +14,6 @@ from backend.core.extractors import (
     HiddenFieldExtractor,
     JWTExtractor,
     GraphQLExtractor,
-    WebSocketExtractor,
     ExtractionOrchestrator,
 )
 

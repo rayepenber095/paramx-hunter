@@ -7,11 +7,10 @@ Optimized for millions of parameters with proper indexing
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from sqlalchemy import (
     BigInteger, Boolean, DateTime, Enum as SAEnum, Float, ForeignKey,
-    Index, Integer, JSON, String, Text, UniqueConstraint, func
+    Index, Integer, String, Text, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncAttrs

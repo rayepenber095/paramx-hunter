@@ -449,7 +449,6 @@ class AsyncCrawler:
 
             # Worker pool
             results_buffer = []
-            workers = []
 
             async def worker():
                 while self._running:

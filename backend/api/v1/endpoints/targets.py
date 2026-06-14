@@ -4,7 +4,7 @@ ParamX Hunter - Targets API Endpoints
 
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

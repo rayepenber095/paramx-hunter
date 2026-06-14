@@ -7,10 +7,9 @@ Captures all network traffic including XHR/fetch for parameter discovery.
 import asyncio
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 import structlog
-from playwright.async_api import async_playwright, Page, Route, Request as PWRequest
+from playwright.async_api import async_playwright, Request as PWRequest
 
 logger = structlog.get_logger(__name__)
 

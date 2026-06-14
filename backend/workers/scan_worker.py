@@ -52,7 +52,7 @@ def scan_visited_key(scan_id: str) -> str:
 async def launch_scan(scan_id: str) -> None:
     """Main scan orchestration coroutine."""
     from backend.database.session import AsyncSessionLocal
-    from backend.database.models import Scan, Endpoint, Parameter, Request, ScanStatus
+    from backend.database.models import Scan, ScanStatus
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import select

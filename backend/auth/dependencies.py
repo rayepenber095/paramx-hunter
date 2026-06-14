@@ -5,7 +5,6 @@ Roles: Admin, Manager, Analyst, Viewer
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
