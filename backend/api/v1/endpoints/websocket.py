@@ -7,7 +7,7 @@ import asyncio
 import json
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from backend.auth.dependencies import decode_token
 from backend.config import settings

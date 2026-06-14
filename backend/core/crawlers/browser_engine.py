@@ -9,7 +9,8 @@ import re
 from dataclasses import dataclass, field
 
 import structlog
-from playwright.async_api import async_playwright, Request as PWRequest
+from playwright.async_api import Request as PWRequest
+from playwright.async_api import async_playwright
 
 logger = structlog.get_logger(__name__)
 
@@ -129,13 +130,15 @@ class BrowserEngine:
             # ── Network listeners ────────────────────────────────────────────
             def on_request(req: PWRequest):
                 if req.resource_type in ("xhr", "fetch", "document", "websocket"):
-                    captured_requests.append(CapturedRequest(
-                        url=req.url,
-                        method=req.method,
-                        headers=dict(req.headers),
-                        post_data=req.post_data,
-                        resource_type=req.resource_type,
-                    ))
+                    captured_requests.append(
+                        CapturedRequest(
+                            url=req.url,
+                            method=req.method,
+                            headers=dict(req.headers),
+                            post_data=req.post_data,
+                            resource_type=req.resource_type,
+                        )
+                    )
 
             async def on_response(resp):
                 try:
@@ -146,12 +149,14 @@ class BrowserEngine:
                             body = await resp.text()
                         except Exception:
                             body = None
-                    captured_responses.append(CapturedResponse(
-                        url=resp.url,
-                        status=resp.status,
-                        headers=dict(resp.headers),
-                        body=body[:50000] if body else None,  # cap response body
-                    ))
+                    captured_responses.append(
+                        CapturedResponse(
+                            url=resp.url,
+                            status=resp.status,
+                            headers=dict(resp.headers),
+                            body=body[:50000] if body else None,  # cap response body
+                        )
+                    )
                 except Exception:
                     pass
 
@@ -174,7 +179,9 @@ class BrowserEngine:
                 logger.warning("page_load_timeout", url=url, error=str(e))
                 # Try domcontentloaded as fallback
                 try:
-                    await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+                    await page.goto(
+                        url, wait_until="domcontentloaded", timeout=self.timeout_ms
+                    )
                 except Exception:
                     pass
 
@@ -185,23 +192,27 @@ class BrowserEngine:
             title = await page.title()
 
             # ── Storage extraction ───────────────────────────────────────────
-            local_storage = await page.evaluate("""() => {
+            local_storage = await page.evaluate(
+                """() => {
                 const items = {};
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
                     items[key] = localStorage.getItem(key);
                 }
                 return items;
-            }""")
+            }"""
+            )
 
-            session_storage = await page.evaluate("""() => {
+            session_storage = await page.evaluate(
+                """() => {
                 const items = {};
                 for (let i = 0; i < sessionStorage.length; i++) {
                     const key = sessionStorage.key(i);
                     items[key] = sessionStorage.getItem(key);
                 }
                 return items;
-            }""")
+            }"""
+            )
 
             framework = self._detect_framework(html, captured_requests)
 
@@ -220,7 +231,9 @@ class BrowserEngine:
                 session_storage=session_storage,
             )
 
-    def _detect_framework(self, html: str, requests: list[CapturedRequest]) -> str | None:
+    def _detect_framework(
+        self, html: str, requests: list[CapturedRequest]
+    ) -> str | None:
         combined = html + " ".join(r.url for r in requests)
         for framework, patterns in FRAMEWORK_SIGNATURES.items():
             for pattern in patterns:

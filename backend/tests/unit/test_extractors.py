@@ -5,22 +5,23 @@ ParamX Hunter - Unit Tests: Parameter Extraction Engine
 import json
 
 from backend.core.extractors import (
-    URLExtractor,
-    HeaderExtractor,
     CookieExtractor,
-    JSONExtractor,
-    XMLExtractor,
-    FormExtractor,
-    HiddenFieldExtractor,
-    JWTExtractor,
-    GraphQLExtractor,
     ExtractionOrchestrator,
+    FormExtractor,
+    GraphQLExtractor,
+    HeaderExtractor,
+    HiddenFieldExtractor,
+    JSONExtractor,
+    JWTExtractor,
+    URLExtractor,
+    XMLExtractor,
 )
 
 ENDPOINT = "https://example.com/api/v1/test"
 
 
 # ── URL Extractor ──────────────────────────────────────────────────────────────
+
 
 class TestURLExtractor:
     def test_query_params(self):
@@ -64,6 +65,7 @@ class TestURLExtractor:
 
 # ── Header Extractor ───────────────────────────────────────────────────────────
 
+
 class TestHeaderExtractor:
     def test_standard_header(self):
         headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
@@ -89,6 +91,7 @@ class TestHeaderExtractor:
 
 # ── Cookie Extractor ───────────────────────────────────────────────────────────
 
+
 class TestCookieExtractor:
     def test_session_cookie(self):
         cookies = {"sessionid": "abc123xyz", "csrftoken": "xyz"}
@@ -103,6 +106,7 @@ class TestCookieExtractor:
 
 
 # ── JSON Extractor ─────────────────────────────────────────────────────────────
+
 
 class TestJSONExtractor:
     def test_flat_json(self):
@@ -137,6 +141,7 @@ class TestJSONExtractor:
 
 # ── XML Extractor ──────────────────────────────────────────────────────────────
 
+
 class TestXMLExtractor:
     def test_simple_xml(self):
         xml = "<request><username>admin</username><role>user</role></request>"
@@ -158,6 +163,7 @@ class TestXMLExtractor:
 
 # ── Form Extractor ─────────────────────────────────────────────────────────────
 
+
 class TestFormExtractor:
     def test_url_encoded(self):
         body = "username=admin&password=secret&remember=1"
@@ -174,6 +180,7 @@ class TestFormExtractor:
 
 
 # ── Hidden Field Extractor ─────────────────────────────────────────────────────
+
 
 class TestHiddenFieldExtractor:
     def test_detects_hidden_inputs(self):
@@ -197,6 +204,7 @@ class TestHiddenFieldExtractor:
 
 
 # ── JWT Extractor ──────────────────────────────────────────────────────────────
+
 
 class TestJWTExtractor:
     # A real HS256 JWT: header.payload.sig
@@ -225,28 +233,34 @@ class TestJWTExtractor:
 
 # ── GraphQL Extractor ──────────────────────────────────────────────────────────
 
+
 class TestGraphQLExtractor:
     def test_variables_extracted(self):
-        body = json.dumps({
-            "query": "query GetUser($id: ID!, $role: String) { user(id: $id) { name } }",
-            "variables": {"id": "42", "role": "admin"},
-            "operationName": "GetUser",
-        })
+        body = json.dumps(
+            {
+                "query": "query GetUser($id: ID!, $role: String) { user(id: $id) { name } }",
+                "variables": {"id": "42", "role": "admin"},
+                "operationName": "GetUser",
+            }
+        )
         params = list(GraphQLExtractor(ENDPOINT, "POST").extract(body))
         names = {p.name for p in params}
         assert "id" in names
         assert "role" in names
 
     def test_operation_name_extracted(self):
-        body = json.dumps({
-            "query": "mutation Login($email: String!, $password: String!) { login(email: $email) { token } }",
-            "variables": {"email": "a@b.com", "password": "xxx"},
-        })
+        body = json.dumps(
+            {
+                "query": "mutation Login($email: String!, $password: String!) { login(email: $email) { token } }",
+                "variables": {"email": "a@b.com", "password": "xxx"},
+            }
+        )
         params = list(GraphQLExtractor(ENDPOINT, "POST").extract(body))
         assert any(p.param_type == "graphql_variable" for p in params)
 
 
 # ── Orchestrator ───────────────────────────────────────────────────────────────
+
 
 class TestExtractionOrchestrator:
     def test_full_request(self):
@@ -278,7 +292,5 @@ class TestExtractionOrchestrator:
 
     def test_hidden_fields_from_html(self):
         orch = ExtractionOrchestrator("https://example.com/form", "GET")
-        orch.process_response_html(
-            '<input type="hidden" name="_token" value="abc">'
-        )
+        orch.process_response_html('<input type="hidden" name="_token" value="abc">')
         assert any(p.name == "_token" for p in orch.results)

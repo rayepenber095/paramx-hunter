@@ -25,6 +25,7 @@ logger = structlog.get_logger(__name__)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CrawlConfig:
     target_url: str
@@ -41,10 +42,24 @@ class CrawlConfig:
     custom_headers: dict = field(default_factory=dict)
     cookies: dict = field(default_factory=dict)
     scope_regex: list[str] = field(default_factory=list)
-    excluded_extensions: set[str] = field(default_factory=lambda: {
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff",
-        ".woff2", ".ttf", ".eot", ".mp4", ".mp3", ".pdf", ".zip"
-    })
+    excluded_extensions: set[str] = field(
+        default_factory=lambda: {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".svg",
+            ".ico",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".eot",
+            ".mp4",
+            ".mp3",
+            ".pdf",
+            ".zip",
+        }
+    )
 
 
 @dataclass
@@ -68,6 +83,7 @@ class CrawlResult:
 
 
 # ── URL Normalizer ─────────────────────────────────────────────────────────────
+
 
 class URLNormalizer:
     def __init__(self, base_url: str):
@@ -101,14 +117,17 @@ class URLNormalizer:
 
 # ── Link Extractor ─────────────────────────────────────────────────────────────
 
+
 class LinkExtractor:
     JS_URL_PATTERN = re.compile(
-        r'(?:fetch|axios\.get|axios\.post|\.get|\.post|\.put|\.delete|\.patch)'
+        r"(?:fetch|axios\.get|axios\.post|\.get|\.post|\.put|\.delete|\.patch)"
         r'\s*\(\s*["\']([^"\']+)["\']',
         re.IGNORECASE,
     )
     WS_PATTERN = re.compile(r'new WebSocket\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
-    SRC_HREF_PATTERN = re.compile(r'(?:href|src|action)\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+    SRC_HREF_PATTERN = re.compile(
+        r'(?:href|src|action)\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE
+    )
 
     @classmethod
     def extract_from_html(
@@ -145,17 +164,21 @@ class LinkExtractor:
             action_url = normalizer.normalize(action, base_url) if action else base_url
             inputs = []
             for inp in form.find_all(["input", "select", "textarea"]):
-                inputs.append({
-                    "name": inp.get("name", ""),
-                    "type": inp.get("type", "text"),
-                    "value": inp.get("value", ""),
-                    "required": inp.has_attr("required"),
-                })
-            forms.append({
-                "action": action_url,
-                "method": method,
-                "inputs": inputs,
-            })
+                inputs.append(
+                    {
+                        "name": inp.get("name", ""),
+                        "type": inp.get("type", "text"),
+                        "value": inp.get("value", ""),
+                        "required": inp.has_attr("required"),
+                    }
+                )
+            forms.append(
+                {
+                    "action": action_url,
+                    "method": method,
+                    "inputs": inputs,
+                }
+            )
             if action_url:
                 links.append(action_url)
 
@@ -171,7 +194,12 @@ class LinkExtractor:
             for match in cls.WS_PATTERN.finditer(code):
                 websocket_urls.append(match.group(1))
 
-        return list(set(links)), forms, list(set(websocket_urls)), list(set(js_endpoints))
+        return (
+            list(set(links)),
+            forms,
+            list(set(websocket_urls)),
+            list(set(js_endpoints)),
+        )
 
     @classmethod
     def detect_framework(cls, html: str, headers: dict) -> str | None:
@@ -199,6 +227,7 @@ class LinkExtractor:
 
 # ── Robots.txt Parser ──────────────────────────────────────────────────────────
 
+
 class RobotsParser:
     def __init__(self):
         self._parsers: dict[str, urllib.robotparser.RobotFileParser] = {}
@@ -210,7 +239,9 @@ class RobotsParser:
         if domain not in self._parsers:
             robots_url = f"{urlparse(url).scheme}://{domain}/robots.txt"
             try:
-                async with session.get(robots_url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                async with session.get(
+                    robots_url, timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
                     content = await resp.text()
                     rp = urllib.robotparser.RobotFileParser()
                     rp.parse(content.splitlines())
@@ -246,13 +277,16 @@ class RobotsParser:
                         # Parse XML sitemap
                         loc_re = re.compile(r"<loc>(.*?)</loc>", re.IGNORECASE)
                         urls.extend(loc_re.findall(content))
-                        logger.info("sitemap_discovered", url=sitemap_url, count=len(urls))
+                        logger.info(
+                            "sitemap_discovered", url=sitemap_url, count=len(urls)
+                        )
             except Exception:
                 continue
         return urls
 
 
 # ── Main Crawler ───────────────────────────────────────────────────────────────
+
 
 class AsyncCrawler:
     """
@@ -286,9 +320,9 @@ class AsyncCrawler:
         self.stats: dict = defaultdict(int)
 
         # Compiled scope regex
-        self._scope_patterns = [
-            re.compile(p) for p in config.scope_regex
-        ] if config.scope_regex else []
+        self._scope_patterns = (
+            [re.compile(p) for p in config.scope_regex] if config.scope_regex else []
+        )
 
     def _url_fingerprint(self, url: str) -> str:
         """Normalized URL hash for deduplication."""
@@ -325,7 +359,8 @@ class AsyncCrawler:
 
             timeout = aiohttp.ClientTimeout(total=self.config.timeout_seconds)
             async with session.request(
-                method, url,
+                method,
+                url,
                 headers=headers,
                 allow_redirects=self.config.follow_redirects,
                 timeout=timeout,
@@ -348,17 +383,31 @@ class AsyncCrawler:
                 )
         except asyncio.TimeoutError:
             return CrawlResult(
-                url=url, method=method, status_code=None,
-                headers={}, response_headers={}, body=None,
-                content_type="", response_time_ms=self.config.timeout_seconds * 1000,
-                depth=depth, referrer=referrer, error="timeout"
+                url=url,
+                method=method,
+                status_code=None,
+                headers={},
+                response_headers={},
+                body=None,
+                content_type="",
+                response_time_ms=self.config.timeout_seconds * 1000,
+                depth=depth,
+                referrer=referrer,
+                error="timeout",
             )
         except Exception as e:
             return CrawlResult(
-                url=url, method=method, status_code=None,
-                headers={}, response_headers={}, body=None,
-                content_type="", response_time_ms=0,
-                depth=depth, referrer=referrer, error=str(e)
+                url=url,
+                method=method,
+                status_code=None,
+                headers={},
+                response_headers={},
+                body=None,
+                content_type="",
+                response_time_ms=0,
+                depth=depth,
+                referrer=referrer,
+                error=str(e),
             )
 
     async def _process_result(
@@ -391,7 +440,9 @@ class AsyncCrawler:
                 # Queue new links
                 if result.depth < self.config.max_depth:
                     for link in links + js_eps:
-                        if not self.normalizer.is_in_scope(link, self.config.crawl_subdomains):
+                        if not self.normalizer.is_in_scope(
+                            link, self.config.crawl_subdomains
+                        ):
                             continue
                         if self._is_excluded(link):
                             continue
@@ -474,7 +525,9 @@ class AsyncCrawler:
                     if self.config.request_delay_ms > 0:
                         await asyncio.sleep(self.config.request_delay_ms / 1000)
 
-                    result = await self._fetch(session, url, depth=depth, referrer=referrer)
+                    result = await self._fetch(
+                        session, url, depth=depth, referrer=referrer
+                    )
                     await self._process_result(result, session)
                     results_buffer.append(result)
                     self._queue.task_done()
@@ -488,7 +541,9 @@ class AsyncCrawler:
                     )
 
             # Launch workers
-            tasks = [asyncio.create_task(worker()) for _ in range(self.config.concurrency)]
+            tasks = [
+                asyncio.create_task(worker()) for _ in range(self.config.concurrency)
+            ]
             await asyncio.gather(*tasks, return_exceptions=True)
 
             elapsed = time.monotonic() - self._start_time
@@ -504,9 +559,7 @@ class AsyncCrawler:
             for result in results_buffer:
                 yield result
 
-    async def crawl_with_playwright(
-        self, url: str
-    ) -> CrawlResult:
+    async def crawl_with_playwright(self, url: str) -> CrawlResult:
         """
         JavaScript-rendered crawl using Playwright.
         Used for SPAs (React, Angular, Vue).
@@ -521,12 +574,17 @@ class AsyncCrawler:
             # Capture all network requests
             requests_captured = []
             page: Page = await context.new_page()
-            page.on("request", lambda req: requests_captured.append({
-                "url": req.url,
-                "method": req.method,
-                "headers": dict(req.headers),
-                "post_data": req.post_data,
-            }))
+            page.on(
+                "request",
+                lambda req: requests_captured.append(
+                    {
+                        "url": req.url,
+                        "method": req.method,
+                        "headers": dict(req.headers),
+                        "post_data": req.post_data,
+                    }
+                ),
+            )
 
             start = time.monotonic()
             response = await page.goto(url, wait_until="networkidle", timeout=30000)

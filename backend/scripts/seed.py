@@ -69,7 +69,9 @@ async def create_admin(email: str, username: str, password: str) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Seed ParamX Hunter database with an admin user")
+    parser = argparse.ArgumentParser(
+        description="Seed ParamX Hunter database with an admin user"
+    )
     parser.add_argument("--email", default="admin@paramxhunter.local")
     parser.add_argument("--username", default="admin")
     parser.add_argument("--password", default="ChangeMe123!")

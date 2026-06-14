@@ -5,17 +5,10 @@ All REST endpoints
 
 from fastapi import APIRouter
 
-from backend.api.v1.endpoints import (
-    auth,
-    projects,
-    targets,
-    scans,
-    parameters,
-    endpoints as ep_router,
-    reports,
-    dashboard,
-    websocket as ws_router,
-)
+from backend.api.v1.endpoints import auth, dashboard
+from backend.api.v1.endpoints import endpoints as ep_router
+from backend.api.v1.endpoints import parameters, projects, reports, scans, targets
+from backend.api.v1.endpoints import websocket as ws_router
 
 router = APIRouter()
 

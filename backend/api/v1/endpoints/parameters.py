@@ -23,6 +23,7 @@ router = APIRouter()
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
+
 class ParameterResponse(BaseModel):
     id: uuid.UUID
     scan_id: uuid.UUID
@@ -78,6 +79,7 @@ class ParameterStats(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/", response_model=ParameterListResponse)
 async def list_parameters(
     scan_id: uuid.UUID | None = Query(None),
@@ -91,7 +93,10 @@ async def list_parameters(
     tags: list[str] | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=500),
-    sort_by: str = Query("first_seen", enum=["name", "first_seen", "last_seen", "frequency", "risk_level"]),
+    sort_by: str = Query(
+        "first_seen",
+        enum=["name", "first_seen", "last_seen", "frequency", "risk_level"],
+    ),
     sort_dir: str = Query("desc", enum=["asc", "desc"]),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -163,59 +168,74 @@ async def get_parameter_stats(
 ):
     """Aggregate statistics for parameters in a scan."""
     # Total
-    total = (await db.execute(
-        select(func.count()).where(Parameter.scan_id == scan_id)
-    )).scalar_one()
+    total = (
+        await db.execute(select(func.count()).where(Parameter.scan_id == scan_id))
+    ).scalar_one()
 
     # Unique names
-    unique_names = (await db.execute(
-        select(func.count(func.distinct(Parameter.name)))
-        .where(Parameter.scan_id == scan_id)
-    )).scalar_one()
+    unique_names = (
+        await db.execute(
+            select(func.count(func.distinct(Parameter.name))).where(
+                Parameter.scan_id == scan_id
+            )
+        )
+    ).scalar_one()
 
     # Sensitive
-    sensitive = (await db.execute(
-        select(func.count()).where(
-            and_(Parameter.scan_id == scan_id, Parameter.is_sensitive)
+    sensitive = (
+        await db.execute(
+            select(func.count()).where(
+                and_(Parameter.scan_id == scan_id, Parameter.is_sensitive)
+            )
         )
-    )).scalar_one()
+    ).scalar_one()
 
     # Hidden
-    hidden = (await db.execute(
-        select(func.count()).where(
-            and_(Parameter.scan_id == scan_id, Parameter.is_hidden)
+    hidden = (
+        await db.execute(
+            select(func.count()).where(
+                and_(Parameter.scan_id == scan_id, Parameter.is_hidden)
+            )
         )
-    )).scalar_one()
+    ).scalar_one()
 
     # By type
-    type_counts = (await db.execute(
-        select(Parameter.param_type, func.count())
-        .where(Parameter.scan_id == scan_id)
-        .group_by(Parameter.param_type)
-    )).all()
+    type_counts = (
+        await db.execute(
+            select(Parameter.param_type, func.count())
+            .where(Parameter.scan_id == scan_id)
+            .group_by(Parameter.param_type)
+        )
+    ).all()
 
     # By risk
-    risk_counts = (await db.execute(
-        select(Parameter.risk_level, func.count())
-        .where(Parameter.scan_id == scan_id)
-        .group_by(Parameter.risk_level)
-    )).all()
+    risk_counts = (
+        await db.execute(
+            select(Parameter.risk_level, func.count())
+            .where(Parameter.scan_id == scan_id)
+            .group_by(Parameter.risk_level)
+        )
+    ).all()
 
     # By source
-    source_counts = (await db.execute(
-        select(Parameter.source, func.count())
-        .where(Parameter.scan_id == scan_id)
-        .group_by(Parameter.source)
-    )).all()
+    source_counts = (
+        await db.execute(
+            select(Parameter.source, func.count())
+            .where(Parameter.scan_id == scan_id)
+            .group_by(Parameter.source)
+        )
+    ).all()
 
     # Top names
-    top_names_result = (await db.execute(
-        select(Parameter.name, func.count().label("count"))
-        .where(Parameter.scan_id == scan_id)
-        .group_by(Parameter.name)
-        .order_by(func.count().desc())
-        .limit(20)
-    )).all()
+    top_names_result = (
+        await db.execute(
+            select(Parameter.name, func.count().label("count"))
+            .where(Parameter.scan_id == scan_id)
+            .group_by(Parameter.name)
+            .order_by(func.count().desc())
+            .limit(20)
+        )
+    ).all()
 
     return ParameterStats(
         total=total,
@@ -289,32 +309,57 @@ async def export_csv(
     current_user: User = Depends(get_current_user),
 ):
     """Export parameters as CSV."""
-    stmt = select(Parameter).where(Parameter.scan_id == scan_id).order_by(Parameter.name)
+    stmt = (
+        select(Parameter).where(Parameter.scan_id == scan_id).order_by(Parameter.name)
+    )
     result = await db.execute(stmt)
     params = result.scalars().all()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "Name", "Type", "Source", "Method", "Value",
-        "Risk Level", "Risk Tags", "Sensitive", "Hidden",
-        "Confidence", "Frequency", "First Seen", "Last Seen"
-    ])
+    writer.writerow(
+        [
+            "Name",
+            "Type",
+            "Source",
+            "Method",
+            "Value",
+            "Risk Level",
+            "Risk Tags",
+            "Sensitive",
+            "Hidden",
+            "Confidence",
+            "Frequency",
+            "First Seen",
+            "Last Seen",
+        ]
+    )
     for p in params:
-        writer.writerow([
-            p.name, p.param_type, p.source, p.method or "",
-            (p.value or "")[:200],
-            p.risk_level, ",".join(p.risk_tags),
-            p.is_sensitive, p.is_hidden,
-            round(p.confidence_score, 2), p.frequency,
-            p.first_seen.isoformat(), p.last_seen.isoformat(),
-        ])
+        writer.writerow(
+            [
+                p.name,
+                p.param_type,
+                p.source,
+                p.method or "",
+                (p.value or "")[:200],
+                p.risk_level,
+                ",".join(p.risk_tags),
+                p.is_sensitive,
+                p.is_hidden,
+                round(p.confidence_score, 2),
+                p.frequency,
+                p.first_seen.isoformat(),
+                p.last_seen.isoformat(),
+            ]
+        )
 
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=parameters_{scan_id}.csv"}
+        headers={
+            "Content-Disposition": f"attachment; filename=parameters_{scan_id}.csv"
+        },
     )
 
 
@@ -332,17 +377,20 @@ async def export_json(
     data = {
         "scan_id": str(scan_id),
         "total": len(params),
-        "parameters": [_to_response(p).model_dump() for p in params]
+        "parameters": [_to_response(p).model_dump() for p in params],
     }
 
     return StreamingResponse(
         iter([json.dumps(data, indent=2, default=str)]),
         media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename=parameters_{scan_id}.json"}
+        headers={
+            "Content-Disposition": f"attachment; filename=parameters_{scan_id}.json"
+        },
     )
 
 
 # ── Helper ─────────────────────────────────────────────────────────────────────
+
 
 def _to_response(p: Parameter) -> ParameterResponse:
     return ParameterResponse(

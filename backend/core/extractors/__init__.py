@@ -16,8 +16,8 @@ from xml.etree import ElementTree as ET
 
 import defusedxml.ElementTree as DefusedET
 
-
 # ── Extracted Parameter Dataclass ─────────────────────────────────────────────
+
 
 @dataclass
 class ExtractedParameter:
@@ -127,8 +127,13 @@ def classify_parameter(name: str, base_type: str) -> tuple[str, list[str], bool]
     # functional categories. Already-specific types (header_auth,
     # cookie, session, jwt_claim, csrf_token, etc.) are preserved.
     GENERIC_TYPES = {
-        "url_query", "fragment", "form_urlencoded", "json_body",
-        "json_nested", "header_custom", "path",
+        "url_query",
+        "fragment",
+        "form_urlencoded",
+        "json_body",
+        "json_nested",
+        "header_custom",
+        "path",
     }
     if base_type not in GENERIC_TYPES:
         return base_type, risk_tags, is_sensitive
@@ -189,6 +194,7 @@ def infer_data_type(value: Any) -> str:
 
 # ── Base Extractor ─────────────────────────────────────────────────────────────
 
+
 class BaseExtractor(ABC):
     """Abstract base for all parameter extractors."""
 
@@ -230,6 +236,7 @@ class BaseExtractor(ABC):
 
 # ── URL Extractor ──────────────────────────────────────────────────────────────
 
+
 class URLExtractor(BaseExtractor):
     """Extracts query, path, and fragment parameters from URLs."""
 
@@ -257,34 +264,59 @@ class URLExtractor(BaseExtractor):
         for i, seg in enumerate(path_segments):
             if re.match(r"^\d+$", seg):
                 yield self._make_param(
-                    f"path_segment_{i}", seg, "path", "url_path",
-                    confidence=0.7, extra={"position": i}
+                    f"path_segment_{i}",
+                    seg,
+                    "path",
+                    "url_path",
+                    confidence=0.7,
+                    extra={"position": i},
                 )
             elif re.match(r"^[0-9a-f-]{32,}$", seg, re.IGNORECASE):
                 yield self._make_param(
-                    f"path_id_{i}", seg, "path", "url_path",
-                    confidence=0.9, extra={"position": i, "pattern": "uuid_like"}
+                    f"path_id_{i}",
+                    seg,
+                    "path",
+                    "url_path",
+                    confidence=0.9,
+                    extra={"position": i, "pattern": "uuid_like"},
                 )
 
 
 # ── Header Extractor ───────────────────────────────────────────────────────────
 
 STANDARD_HEADERS = {
-    "accept", "accept-encoding", "accept-language", "cache-control",
-    "connection", "content-length", "content-type", "host", "origin",
-    "referer", "user-agent",
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "cache-control",
+    "connection",
+    "content-length",
+    "content-type",
+    "host",
+    "origin",
+    "referer",
+    "user-agent",
 }
 
 AUTH_HEADERS = {
-    "authorization", "x-api-key", "x-auth-token", "x-access-token",
-    "x-session-token", "api-key", "token", "x-csrf-token", "x-xsrf-token",
+    "authorization",
+    "x-api-key",
+    "x-auth-token",
+    "x-access-token",
+    "x-session-token",
+    "api-key",
+    "token",
+    "x-csrf-token",
+    "x-xsrf-token",
 }
 
 
 class HeaderExtractor(BaseExtractor):
     extractor_name = "header"
 
-    def extract(self, data: dict[str, str]) -> Generator[ExtractedParameter, None, None]:
+    def extract(
+        self, data: dict[str, str]
+    ) -> Generator[ExtractedParameter, None, None]:
         for name, value in data.items():
             lname = name.lower()
 
@@ -309,7 +341,9 @@ SESSION_COOKIE_PATTERNS = re.compile(
 class CookieExtractor(BaseExtractor):
     extractor_name = "cookie"
 
-    def extract(self, data: dict[str, str]) -> Generator[ExtractedParameter, None, None]:
+    def extract(
+        self, data: dict[str, str]
+    ) -> Generator[ExtractedParameter, None, None]:
         for name, value in data.items():
             is_session = bool(SESSION_COOKIE_PATTERNS.search(name))
             ptype = "session" if is_session else "cookie"
@@ -330,6 +364,7 @@ class CookieExtractor(BaseExtractor):
 
 
 # ── JSON Extractor ─────────────────────────────────────────────────────────────
+
 
 class JSONExtractor(BaseExtractor):
     extractor_name = "json"
@@ -353,14 +388,20 @@ class JSONExtractor(BaseExtractor):
 
                 if isinstance(value, (dict, list)):
                     yield self._make_param(
-                        full_path, json.dumps(value)[:200], ptype, "request_body",
-                        extra={"json_path": full_path}
+                        full_path,
+                        json.dumps(value)[:200],
+                        ptype,
+                        "request_body",
+                        extra={"json_path": full_path},
                     )
                     yield from self._extract_recursive(value, full_path)
                 else:
                     yield self._make_param(
-                        full_path, value, ptype, "request_body",
-                        extra={"json_path": full_path}
+                        full_path,
+                        value,
+                        ptype,
+                        "request_body",
+                        extra={"json_path": full_path},
                     )
         elif isinstance(data, list):
             for i, item in enumerate(data[:10]):  # cap array inspection
@@ -368,6 +409,7 @@ class JSONExtractor(BaseExtractor):
 
 
 # ── XML Extractor ──────────────────────────────────────────────────────────────
+
 
 class XMLExtractor(BaseExtractor):
     extractor_name = "xml"
@@ -386,15 +428,21 @@ class XMLExtractor(BaseExtractor):
         # Element text
         if element.text and element.text.strip():
             yield self._make_param(
-                current_path, element.text.strip(), "xml", "request_body",
-                extra={"xml_path": current_path}
+                current_path,
+                element.text.strip(),
+                "xml",
+                "request_body",
+                extra={"xml_path": current_path},
             )
 
         # Attributes
         for attr_name, attr_val in element.attrib.items():
             yield self._make_param(
-                f"{current_path}/@{attr_name}", attr_val, "xml", "request_body",
-                extra={"xml_path": current_path, "is_attribute": True}
+                f"{current_path}/@{attr_name}",
+                attr_val,
+                "xml",
+                "request_body",
+                extra={"xml_path": current_path, "is_attribute": True},
             )
 
         for child in element:
@@ -402,6 +450,7 @@ class XMLExtractor(BaseExtractor):
 
 
 # ── SOAP Extractor ─────────────────────────────────────────────────────────────
+
 
 class SOAPExtractor(XMLExtractor):
     extractor_name = "soap"
@@ -424,12 +473,12 @@ class SOAPExtractor(XMLExtractor):
 
 # ── GraphQL Extractor ──────────────────────────────────────────────────────────
 
+
 class GraphQLExtractor(BaseExtractor):
     extractor_name = "graphql"
 
     OPERATION_RE = re.compile(
-        r"(query|mutation|subscription)\s+(\w+)?\s*\(([^)]*)\)",
-        re.DOTALL
+        r"(query|mutation|subscription)\s+(\w+)?\s*\(([^)]*)\)", re.DOTALL
     )
     FIELD_RE = re.compile(r"\$(\w+)\s*:\s*(\w+[!?]*)")
 
@@ -449,16 +498,22 @@ class GraphQLExtractor(BaseExtractor):
             var_name, var_type = match.group(1), match.group(2)
             value = variables.get(var_name) if variables else None
             yield self._make_param(
-                var_name, value, "graphql_variable", "graphql",
-                extra={"gql_type": var_type, "operation": operation_name}
+                var_name,
+                value,
+                "graphql_variable",
+                "graphql",
+                extra={"gql_type": var_type, "operation": operation_name},
             )
 
         # Detect operation type
         op_match = self.OPERATION_RE.search(query)
         if op_match:
             yield self._make_param(
-                "operationName", operation_name, "graphql_query", "graphql",
-                extra={"operation_type": op_match.group(1)}
+                "operationName",
+                operation_name,
+                "graphql_query",
+                "graphql",
+                extra={"operation_type": op_match.group(1)},
             )
 
         # Extract variables payload
@@ -471,6 +526,7 @@ class GraphQLExtractor(BaseExtractor):
 
 
 # ── Form Extractor ─────────────────────────────────────────────────────────────
+
 
 class FormExtractor(BaseExtractor):
     extractor_name = "form"
@@ -494,6 +550,7 @@ class FormExtractor(BaseExtractor):
 
 class HiddenFieldExtractor(BaseExtractor):
     """Extracts hidden form fields from HTML."""
+
     extractor_name = "hidden_field"
 
     HIDDEN_FIELD_RE = re.compile(
@@ -515,12 +572,16 @@ class HiddenFieldExtractor(BaseExtractor):
                     continue
                 seen.add(name)
                 yield self._make_param(
-                    name, value, "hidden_field", "html_form",
-                    extra={"is_hidden_input": True}
+                    name,
+                    value,
+                    "hidden_field",
+                    "html_form",
+                    extra={"is_hidden_input": True},
                 )
 
 
 # ── JWT Extractor ──────────────────────────────────────────────────────────────
+
 
 class JWTExtractor(BaseExtractor):
     extractor_name = "jwt"
@@ -537,8 +598,12 @@ class JWTExtractor(BaseExtractor):
             header = json.loads(header_raw)
             for key, val in header.items():
                 yield self._make_param(
-                    f"jwt.header.{key}", val, "jwt_claim", "jwt_header",
-                    confidence=0.95, extra={"jwt_section": "header"}
+                    f"jwt.header.{key}",
+                    val,
+                    "jwt_claim",
+                    "jwt_header",
+                    confidence=0.95,
+                    extra={"jwt_section": "header"},
                 )
 
             # Decode payload
@@ -546,15 +611,19 @@ class JWTExtractor(BaseExtractor):
             payload = json.loads(payload_raw)
             for key, val in payload.items():
                 yield self._make_param(
-                    f"jwt.{key}", val, "jwt_claim", "jwt_payload",
+                    f"jwt.{key}",
+                    val,
+                    "jwt_claim",
+                    "jwt_payload",
                     confidence=0.95,
-                    extra={"jwt_section": "payload", "claim": key}
+                    extra={"jwt_section": "payload", "claim": key},
                 )
         except Exception:
             return
 
 
 # ── WebSocket Extractor ────────────────────────────────────────────────────────
+
 
 class WebSocketExtractor(BaseExtractor):
     extractor_name = "websocket"
@@ -565,8 +634,7 @@ class WebSocketExtractor(BaseExtractor):
                 data = json.loads(data)
             except json.JSONDecodeError:
                 yield self._make_param(
-                    "ws_raw_message", data, "websocket", "websocket",
-                    confidence=0.5
+                    "ws_raw_message", data, "websocket", "websocket", confidence=0.5
                 )
                 return
 
@@ -580,19 +648,29 @@ class WebSocketExtractor(BaseExtractor):
 
 # ── gRPC Metadata Extractor ─────────────────────────────────────────────────────
 
+
 class GRPCExtractor(BaseExtractor):
     """
     Extracts gRPC-Web / gRPC metadata from HTTP headers and trailers.
     """
+
     extractor_name = "grpc"
 
     GRPC_RESERVED_HEADERS = {
-        "grpc-timeout", "grpc-encoding", "grpc-accept-encoding",
-        "grpc-status", "grpc-message", "grpc-status-details-bin",
-        "content-type", "te", "grpc-trace-bin",
+        "grpc-timeout",
+        "grpc-encoding",
+        "grpc-accept-encoding",
+        "grpc-status",
+        "grpc-message",
+        "grpc-status-details-bin",
+        "content-type",
+        "te",
+        "grpc-trace-bin",
     }
 
-    def extract(self, headers: dict[str, str]) -> Generator[ExtractedParameter, None, None]:
+    def extract(
+        self, headers: dict[str, str]
+    ) -> Generator[ExtractedParameter, None, None]:
         ct = headers.get("content-type", headers.get("Content-Type", ""))
         if "grpc" not in ct.lower():
             return
@@ -603,19 +681,24 @@ class GRPCExtractor(BaseExtractor):
                 continue
             confidence = 0.9 if lname.endswith("-bin") else 0.8
             yield self._make_param(
-                name, value, "grpc_metadata", "grpc_header",
+                name,
+                value,
+                "grpc_metadata",
+                "grpc_header",
                 confidence=confidence,
-                extra={"binary": lname.endswith("-bin")}
+                extra={"binary": lname.endswith("-bin")},
             )
 
 
 # ── Mobile API Extractor ────────────────────────────────────────────────────────
+
 
 class MobileAPIExtractor(BaseExtractor):
     """
     Detects mobile-app-specific API parameters: device IDs, app versions,
     platform identifiers, push tokens commonly sent by iOS/Android clients.
     """
+
     extractor_name = "mobile_api"
 
     MOBILE_HEADER_PATTERNS = re.compile(
@@ -635,19 +718,26 @@ class MobileAPIExtractor(BaseExtractor):
     def extract(self, data: dict | str) -> Generator[ExtractedParameter, None, None]:
         if isinstance(data, dict):
             for name, value in data.items():
-                if self.MOBILE_HEADER_PATTERNS.search(name) or self.MOBILE_BODY_FIELDS.search(name):
+                if self.MOBILE_HEADER_PATTERNS.search(
+                    name
+                ) or self.MOBILE_BODY_FIELDS.search(name):
                     is_id = "id" in name.lower() or "token" in name.lower()
                     yield self._make_param(
-                        name, value, "mobile_api", "mobile_header_or_body",
+                        name,
+                        value,
+                        "mobile_api",
+                        "mobile_header_or_body",
                         confidence=0.85,
-                        extra={"is_device_identifier": is_id}
+                        extra={"is_device_identifier": is_id},
                     )
 
 
 # ── Custom / OpenAPI Extractor ─────────────────────────────────────────────────
 
+
 class OpenAPIExtractor(BaseExtractor):
     """Extracts parameters from OpenAPI/Swagger spec."""
+
     extractor_name = "openapi"
 
     def extract(self, spec: dict) -> Generator[ExtractedParameter, None, None]:
@@ -664,10 +754,12 @@ class OpenAPIExtractor(BaseExtractor):
                     schema = param.get("schema", {})
 
                     p = self._make_param(
-                        name, schema.get("example"),
-                        f"openapi_{loc}", "openapi_spec",
+                        name,
+                        schema.get("example"),
+                        f"openapi_{loc}",
+                        "openapi_spec",
                         confidence=1.0,
-                        extra={"openapi_in": loc, "schema": schema}
+                        extra={"openapi_in": loc, "schema": schema},
                     )
                     p.is_required = required
                     yield p
@@ -676,15 +768,20 @@ class OpenAPIExtractor(BaseExtractor):
                 req_body = operation.get("requestBody", {})
                 for media_type, media_obj in req_body.get("content", {}).items():
                     body_schema = media_obj.get("schema", {})
-                    for prop_name, prop_schema in body_schema.get("properties", {}).items():
+                    for prop_name, prop_schema in body_schema.get(
+                        "properties", {}
+                    ).items():
                         yield self._make_param(
-                            prop_name, prop_schema.get("example"),
-                            "openapi", "openapi_request_body",
-                            extra={"media_type": media_type, "schema": prop_schema}
+                            prop_name,
+                            prop_schema.get("example"),
+                            "openapi",
+                            "openapi_request_body",
+                            extra={"media_type": media_type, "schema": prop_schema},
                         )
 
 
 # ── Extraction Orchestrator ────────────────────────────────────────────────────
+
 
 class ExtractionOrchestrator:
     """Routes request data to appropriate extractors and deduplicates results."""
@@ -729,7 +826,9 @@ class ExtractionOrchestrator:
                 for p in FormExtractor(self.endpoint, self.method).extract(body):
                     self._add(p)
 
-            elif "text/xml" in ct or "application/xml" in ct or "application/soap" in ct:
+            elif (
+                "text/xml" in ct or "application/xml" in ct or "application/soap" in ct
+            ):
                 if "<soap" in body.lower() or "Envelope" in body:
                     for p in SOAPExtractor(self.endpoint, self.method).extract(body):
                         self._add(p)
@@ -767,7 +866,9 @@ class ExtractionOrchestrator:
                 new_params.append(p)
         return new_params
 
-    def process_websocket(self, message: str, direction: str = "send") -> list[ExtractedParameter]:
+    def process_websocket(
+        self, message: str, direction: str = "send"
+    ) -> list[ExtractedParameter]:
         new_params = []
         for p in WebSocketExtractor(self.endpoint, self.method).extract(message):
             p.extra["ws_direction"] = direction

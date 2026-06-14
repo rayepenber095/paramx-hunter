@@ -18,6 +18,7 @@ logger = structlog.get_logger(__name__)
 
 # ── Standard Action Names ──────────────────────────────────────────────────────
 
+
 class AuditAction:
     LOGIN = "auth.login"
     LOGIN_FAILED = "auth.login_failed"
@@ -110,12 +111,14 @@ async def log_audit_event(
 
 # ── Query Helpers ──────────────────────────────────────────────────────────────
 
+
 async def get_user_activity(
     db: AsyncSession,
     user_id: uuid.UUID,
     limit: int = 100,
 ) -> list[AuditLog]:
     from sqlalchemy import select
+
     result = await db.execute(
         select(AuditLog)
         .where(AuditLog.user_id == user_id)
@@ -131,13 +134,16 @@ async def get_resource_history(
     resource_id: str,
     limit: int = 50,
 ) -> list[AuditLog]:
-    from sqlalchemy import select, and_
+    from sqlalchemy import and_, select
+
     result = await db.execute(
         select(AuditLog)
-        .where(and_(
-            AuditLog.resource_type == resource_type,
-            AuditLog.resource_id == resource_id,
-        ))
+        .where(
+            and_(
+                AuditLog.resource_type == resource_type,
+                AuditLog.resource_id == resource_id,
+            )
+        )
         .order_by(AuditLog.timestamp.desc())
         .limit(limit)
     )
