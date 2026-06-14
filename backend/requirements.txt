@@ -10,6 +10,7 @@ python-multipart==0.0.17
 # ── Database ──────────────────────────────────────────────────────────────────
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
+aiosqlite==0.20.0
 alembic==1.14.0
 psycopg2-binary==2.9.10
 
@@ -35,6 +36,7 @@ pydantic[email]==2.10.3
 # ── Authentication & Security ─────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 cryptography==44.0.0
 python-dotenv==1.0.1
 

@@ -5,12 +5,9 @@ Streams real-time scan progress, new parameters, and crawl events to the fronten
 
 import asyncio
 import json
-import uuid
-from typing import Any
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
-from jose import JWTError
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from backend.auth.dependencies import decode_token
 from backend.config import settings

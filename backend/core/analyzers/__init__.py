@@ -15,20 +15,34 @@ logger = structlog.get_logger(__name__)
 
 # Common paths for API docs / schemas
 OPENAPI_PATHS = [
-    "/swagger.json", "/swagger.yaml", "/swagger/v1/swagger.json",
-    "/api-docs", "/api-docs.json", "/v1/api-docs", "/v2/api-docs",
-    "/v3/api-docs", "/openapi.json", "/openapi.yaml",
-    "/api/swagger.json", "/api/openapi.json",
+    "/swagger.json",
+    "/swagger.yaml",
+    "/swagger/v1/swagger.json",
+    "/api-docs",
+    "/api-docs.json",
+    "/v1/api-docs",
+    "/v2/api-docs",
+    "/v3/api-docs",
+    "/openapi.json",
+    "/openapi.yaml",
+    "/api/swagger.json",
+    "/api/openapi.json",
     "/.well-known/openapi.json",
 ]
 
 GRAPHQL_PATHS = [
-    "/graphql", "/graphql/v1", "/api/graphql", "/gql",
-    "/query", "/v1/graphql", "/v2/graphql",
+    "/graphql",
+    "/graphql/v1",
+    "/api/graphql",
+    "/gql",
+    "/query",
+    "/v1/graphql",
+    "/v2/graphql",
 ]
 
-GRAPHQL_INTROSPECTION_QUERY = json.dumps({
-    "query": """
+GRAPHQL_INTROSPECTION_QUERY = json.dumps(
+    {
+        "query": """
     query IntrospectionQuery {
       __schema {
         queryType { name }
@@ -38,13 +52,14 @@ GRAPHQL_INTROSPECTION_QUERY = json.dumps({
       }
     }
     """
-})
+    }
+)
 
 
 @dataclass
 class DiscoveredAPI:
     url: str
-    api_type: str          # "openapi", "swagger", "graphql", "rest"
+    api_type: str  # "openapi", "swagger", "graphql", "rest"
     version: str | None = None
     title: str | None = None
     endpoints_count: int = 0
@@ -63,20 +78,28 @@ class APIDiscoveryEngine:
     async def discover_all(self) -> list[DiscoveredAPI]:
         await self._probe_openapi()
         await self._probe_graphql()
-        logger.info("api_discovery_complete",
-                    base_url=self.base_url,
-                    found=len(self._discovered))
+        logger.info(
+            "api_discovery_complete",
+            base_url=self.base_url,
+            found=len(self._discovered),
+        )
         return self._discovered
 
     async def _probe_openapi(self):
         for path in OPENAPI_PATHS:
             url = urljoin(self.base_url, path)
             try:
-                async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                async with self.session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
                     if resp.status != 200:
                         continue
                     ct = resp.headers.get("content-type", "")
-                    if "json" in ct or "yaml" in ct or path.endswith((".json", ".yaml")):
+                    if (
+                        "json" in ct
+                        or "yaml" in ct
+                        or path.endswith((".json", ".yaml"))
+                    ):
                         text = await resp.text()
                         spec = _parse_openapi_spec(text)
                         if spec:
@@ -108,16 +131,21 @@ class APIDiscoveryEngine:
                         # Parse schema types
                         schema = body.get("data", {}).get("__schema", {})
                         types = schema.get("types", [])
-                        api.endpoints_count = len([
-                            t for t in types
-                            if t.get("kind") not in ("SCALAR", "BUILT_IN")
-                        ])
+                        api.endpoints_count = len(
+                            [
+                                t
+                                for t in types
+                                if t.get("kind") not in ("SCALAR", "BUILT_IN")
+                            ]
+                        )
                         self._discovered.append(api)
                         logger.info("graphql_found", url=url)
             except Exception:
                 pass
 
-    async def detect_from_response(self, url: str, body: str, headers: dict) -> DiscoveredAPI | None:
+    async def detect_from_response(
+        self, url: str, body: str, headers: dict
+    ) -> DiscoveredAPI | None:
         """Detect API type from a live response body + headers."""
         ct = headers.get("content-type", "").lower()
 
@@ -139,6 +167,7 @@ class APIDiscoveryEngine:
 def _parse_openapi_spec(text: str) -> dict | None:
     try:
         import yaml
+
         data = yaml.safe_load(text)
         if isinstance(data, dict) and ("openapi" in data or "swagger" in data):
             return data
@@ -161,7 +190,15 @@ def _build_openapi_api(url: str, spec: dict) -> DiscoveredAPI:
     param_count = 0
     for path, path_item in paths.items():
         for method, op in path_item.items():
-            if method not in ("get", "post", "put", "patch", "delete", "head", "options"):
+            if method not in (
+                "get",
+                "post",
+                "put",
+                "patch",
+                "delete",
+                "head",
+                "options",
+            ):
                 continue
             params = op.get("parameters", [])
             param_count += len(params)
@@ -169,12 +206,14 @@ def _build_openapi_api(url: str, spec: dict) -> DiscoveredAPI:
             for media_content in req_body.get("content", {}).values():
                 schema = media_content.get("schema", {})
                 param_count += len(schema.get("properties", {}))
-            endpoints.append({
-                "path": path,
-                "method": method.upper(),
-                "summary": op.get("summary", ""),
-                "param_count": len(params),
-            })
+            endpoints.append(
+                {
+                    "path": path,
+                    "method": method.upper(),
+                    "summary": op.get("summary", ""),
+                    "param_count": len(params),
+                }
+            )
 
     version = spec.get("openapi") or spec.get("swagger") or "unknown"
     api_type = "openapi" if "openapi" in spec else "swagger"

@@ -3,15 +3,14 @@ ParamX Hunter - Dashboard Stats API
 """
 
 import uuid
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user
-from backend.database.models import (
-    Endpoint, Parameter, Scan, ScanStatus, User, RiskLevel
-)
+from backend.database.models import Endpoint, Parameter, Scan, ScanStatus, User
 from backend.database.session import get_db
 
 router = APIRouter()
@@ -55,26 +54,33 @@ async def get_dashboard_stats(
 
     total_endpoints = await count(Endpoint, *ep_cond)
     total_parameters = await count(Parameter, *param_cond)
-    unique_params = (await db.execute(
-        select(func.count(func.distinct(Parameter.name))).where(and_(*param_cond)) if param_cond
-        else select(func.count(func.distinct(Parameter.name)))
-    )).scalar_one()
-    hidden = await count(Parameter, Parameter.is_hidden == True, *param_cond)
-    sensitive = await count(Parameter, Parameter.is_sensitive == True, *param_cond)
-    apis = await count(Endpoint, Endpoint.is_api == True, *ep_cond)
-    websockets = await count(Endpoint, Endpoint.is_websocket == True, *ep_cond)
+    unique_params = (
+        await db.execute(
+            select(func.count(func.distinct(Parameter.name))).where(and_(*param_cond))
+            if param_cond
+            else select(func.count(func.distinct(Parameter.name)))
+        )
+    ).scalar_one()
+    hidden = await count(Parameter, Parameter.is_hidden, *param_cond)
+    sensitive = await count(Parameter, Parameter.is_sensitive, *param_cond)
+    apis = await count(Endpoint, Endpoint.is_api, *ep_cond)
+    websockets = await count(Endpoint, Endpoint.is_websocket, *ep_cond)
     active_scans = await count(Scan, Scan.status == ScanStatus.RUNNING, *scan_cond)
     total_scans = await count(Scan, *scan_cond)
 
     # Risk distribution
-    risk_stmt = select(Parameter.risk_level, func.count()).group_by(Parameter.risk_level)
+    risk_stmt = select(Parameter.risk_level, func.count()).group_by(
+        Parameter.risk_level
+    )
     if param_cond:
         risk_stmt = risk_stmt.where(and_(*param_cond))
     risk_rows = (await db.execute(risk_stmt)).all()
     risk_dist = {str(r): c for r, c in risk_rows}
 
     # Type distribution
-    type_stmt = select(Parameter.param_type, func.count()).group_by(Parameter.param_type)
+    type_stmt = select(Parameter.param_type, func.count()).group_by(
+        Parameter.param_type
+    )
     if param_cond:
         type_stmt = type_stmt.where(and_(*param_cond))
     type_rows = (await db.execute(type_stmt)).all()

@@ -7,11 +7,18 @@ Optimized for millions of parameters with proper indexing
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
+from sqlalchemy import BigInteger, Boolean, DateTime, JSON
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, Enum as SAEnum, Float, ForeignKey,
-    Index, Integer, JSON, String, Text, UniqueConstraint, func
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
@@ -22,7 +29,12 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
+JSON_TYPE = JSONB().with_variant(JSON(), "sqlite")
+STRING_ARRAY_TYPE = ARRAY(String).with_variant(JSON(), "sqlite")
+
+
 # ── Enums ─────────────────────────────────────────────────────────────────────
+
 
 class UserRole(str, Enum):
     ADMIN = "admin"
@@ -113,19 +125,32 @@ class HttpMethod(str, Enum):
 
 # ── Models ────────────────────────────────────────────────────────────────────
 
+
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
+    username: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), default=UserRole.ANALYST)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
-    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), server_default=func.now()
+    )
+    last_login: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     projects = relationship("Project", back_populates="owner")
     audit_logs = relationship("AuditLog", back_populates="user")
@@ -134,56 +159,74 @@ class User(Base):
 class Project(Base):
     __tablename__ = "projects"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    settings: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    settings: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), server_default=func.now()
+    )
 
     owner = relationship("User", back_populates="projects")
     targets = relationship("Target", back_populates="project")
     scans = relationship("Scan", back_populates="project")
 
-    __table_args__ = (
-        Index("ix_projects_owner_id", "owner_id"),
-    )
+    __table_args__ = (Index("ix_projects_owner_id", "owner_id"),)
 
 
 class Target(Base):
     __tablename__ = "targets"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    scope_urls: Mapped[list] = mapped_column(ARRAY(String), default=list)
-    excluded_urls: Mapped[list] = mapped_column(ARRAY(String), default=list)
-    headers: Mapped[dict] = mapped_column(JSONB, default=dict)
-    cookies: Mapped[dict] = mapped_column(JSONB, default=dict)
-    auth_config: Mapped[dict] = mapped_column(JSONB, default=dict)
-    extra_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    scope_urls: Mapped[list] = mapped_column(STRING_ARRAY_TYPE, default=list)
+    excluded_urls: Mapped[list] = mapped_column(STRING_ARRAY_TYPE, default=list)
+    headers: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
+    cookies: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
+    auth_config: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
+    extra_metadata: Mapped[dict] = mapped_column("metadata", JSON_TYPE, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     project = relationship("Project", back_populates="targets")
     scans = relationship("Scan", back_populates="target")
 
-    __table_args__ = (
-        Index("ix_targets_project_domain", "project_id", "domain"),
-    )
+    __table_args__ = (Index("ix_targets_project_domain", "project_id", "domain"),)
 
 
 class Scan(Base):
     __tablename__ = "scans"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
-    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("targets.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    target_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("targets.id"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[ScanStatus] = mapped_column(SAEnum(ScanStatus), default=ScanStatus.PENDING)
-    config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[ScanStatus] = mapped_column(
+        SAEnum(ScanStatus), default=ScanStatus.PENDING
+    )
+    config: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
     # Stats
     total_requests: Mapped[int] = mapped_column(Integer, default=0)
     total_endpoints: Mapped[int] = mapped_column(Integer, default=0)
@@ -196,9 +239,15 @@ class Scan(Base):
     resume_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Timestamps
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     project = relationship("Project", back_populates="scans")
     target = relationship("Target", back_populates="scans")
@@ -214,13 +263,21 @@ class Scan(Base):
 class Endpoint(Base):
     __tablename__ = "endpoints"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False
+    )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    normalized_url: Mapped[str] = mapped_column(String(2048), nullable=False)  # params stripped
+    normalized_url: Mapped[str] = mapped_column(
+        String(2048), nullable=False
+    )  # params stripped
     path: Mapped[str] = mapped_column(String(1024), nullable=False)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
-    method: Mapped[HttpMethod] = mapped_column(SAEnum(HttpMethod), default=HttpMethod.GET)
+    method: Mapped[HttpMethod] = mapped_column(
+        SAEnum(HttpMethod), default=HttpMethod.GET
+    )
     status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     response_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
@@ -232,10 +289,14 @@ class Endpoint(Base):
     is_rest: Mapped[bool] = mapped_column(Boolean, default=False)
     framework_detected: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # Metadata
-    tags: Mapped[list] = mapped_column(ARRAY(String), default=list)
+    tags: Mapped[list] = mapped_column(STRING_ARRAY_TYPE, default=list)
     fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     scan = relationship("Scan", back_populates="endpoints")
     parameters = relationship("Parameter", back_populates="endpoint")
@@ -252,18 +313,30 @@ class Endpoint(Base):
 class Parameter(Base):
     __tablename__ = "parameters"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False)
-    endpoint_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False
+    )
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=False
+    )
     # Core fields
     name: Mapped[str] = mapped_column(String(512), nullable=False)
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
-    param_type: Mapped[ParameterType] = mapped_column(SAEnum(ParameterType), nullable=False)
-    source: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "url", "header", "body"
+    param_type: Mapped[ParameterType] = mapped_column(
+        SAEnum(ParameterType), nullable=False
+    )
+    source: Mapped[str] = mapped_column(
+        String(100), nullable=False
+    )  # e.g. "url", "header", "body"
     method: Mapped[HttpMethod | None] = mapped_column(SAEnum(HttpMethod), nullable=True)
     # Classification
-    risk_level: Mapped[RiskLevel] = mapped_column(SAEnum(RiskLevel), default=RiskLevel.INFO)
-    risk_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)
+    risk_level: Mapped[RiskLevel] = mapped_column(
+        SAEnum(RiskLevel), default=RiskLevel.INFO
+    )
+    risk_tags: Mapped[list] = mapped_column(STRING_ARRAY_TYPE, default=list)
     is_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
     is_required: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
@@ -271,14 +344,20 @@ class Parameter(Base):
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
     frequency: Mapped[int] = mapped_column(Integer, default=1)
     # Metadata
-    data_type: Mapped[str | None] = mapped_column(String(100), nullable=True)  # string, int, bool, etc.
-    example_values: Mapped[list] = mapped_column(ARRAY(String), default=list)
-    schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    tags: Mapped[list] = mapped_column(ARRAY(String), default=list)
-    extra: Mapped[dict] = mapped_column(JSONB, default=dict)
+    data_type: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # string, int, bool, etc.
+    example_values: Mapped[list] = mapped_column(STRING_ARRAY_TYPE, default=list)
+    schema: Mapped[dict | None] = mapped_column(JSON_TYPE, nullable=True)
+    tags: Mapped[list] = mapped_column(STRING_ARRAY_TYPE, default=list)
+    extra: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
     # Timestamps
-    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     scan = relationship("Scan")
     endpoint = relationship("Endpoint", back_populates="parameters")
@@ -290,30 +369,47 @@ class Parameter(Base):
         Index("ix_params_risk", "scan_id", "risk_level"),
         Index("ix_params_sensitive", "scan_id", "is_sensitive"),
         Index("ix_params_hidden", "scan_id", "is_hidden"),
-        UniqueConstraint("scan_id", "endpoint_id", "name", "param_type", "source", name="uq_param_signature"),
+        UniqueConstraint(
+            "scan_id",
+            "endpoint_id",
+            "name",
+            "param_type",
+            "source",
+            name="uq_param_signature",
+        ),
     )
 
 
 class Request(Base):
     __tablename__ = "requests"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False)
-    endpoint_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False
+    )
+    endpoint_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=True
+    )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    method: Mapped[HttpMethod] = mapped_column(SAEnum(HttpMethod), default=HttpMethod.GET)
-    headers: Mapped[dict] = mapped_column(JSONB, default=dict)
+    method: Mapped[HttpMethod] = mapped_column(
+        SAEnum(HttpMethod), default=HttpMethod.GET
+    )
+    headers: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cookies: Mapped[dict] = mapped_column(JSONB, default=dict)
+    cookies: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
     # Response
     status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    response_headers: Mapped[dict] = mapped_column(JSONB, default=dict)
+    response_headers: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
     response_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Meta
     referrer: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     scan = relationship("Scan", back_populates="requests")
     endpoint = relationship("Endpoint", back_populates="requests")
@@ -328,8 +424,12 @@ class Request(Base):
 class CookieRecord(Base):
     __tablename__ = "cookies"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(512), nullable=False)
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -339,8 +439,12 @@ class CookieRecord(Base):
     same_site: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_session: Mapped[bool] = mapped_column(Boolean, default=False)
     is_tracking: Mapped[bool] = mapped_column(Boolean, default=False)
-    expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     __table_args__ = (
         Index("ix_cookies_scan_domain", "scan_id", "domain"),
@@ -351,53 +455,77 @@ class CookieRecord(Base):
 class GraphQLRecord(Base):
     __tablename__ = "graphql"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False)
-    endpoint_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=False)
-    operation_type: Mapped[str] = mapped_column(String(20), nullable=False)  # query, mutation, subscription
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False
+    )
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=False
+    )
+    operation_type: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # query, mutation, subscription
     operation_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     query: Mapped[str | None] = mapped_column(Text, nullable=True)
-    variables: Mapped[dict] = mapped_column(JSONB, default=dict)
-    schema_fragment: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    variables: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
+    schema_fragment: Mapped[dict | None] = mapped_column(JSON_TYPE, nullable=True)
     introspection_available: Mapped[bool] = mapped_column(Boolean, default=False)
-    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        Index("ix_graphql_scan_operation", "scan_id", "operation_type"),
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )
+
+    __table_args__ = (Index("ix_graphql_scan_operation", "scan_id", "operation_type"),)
 
 
 class WebSocketMessage(Base):
     __tablename__ = "websocket_messages"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False)
-    endpoint_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=False)
-    direction: Mapped[str] = mapped_column(String(10), nullable=False)  # "send" or "receive"
-    message_type: Mapped[str] = mapped_column(String(20), default="text")  # text, binary
-    raw_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    parsed_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    parameters: Mapped[list] = mapped_column(JSONB, default=list)
-    schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        Index("ix_ws_scan_endpoint", "scan_id", "endpoint_id"),
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), nullable=False
+    )
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("endpoints.id"), nullable=False
+    )
+    direction: Mapped[str] = mapped_column(
+        String(10), nullable=False
+    )  # "send" or "receive"
+    message_type: Mapped[str] = mapped_column(
+        String(20), default="text"
+    )  # text, binary
+    raw_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parsed_data: Mapped[dict | None] = mapped_column(JSON_TYPE, nullable=True)
+    parameters: Mapped[list] = mapped_column(JSON_TYPE, default=list)
+    schema: Mapped[dict | None] = mapped_column(JSON_TYPE, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_ws_scan_endpoint", "scan_id", "endpoint_id"),)
 
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     resource_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    details: Mapped[dict] = mapped_column(JSONB, default=dict)
+    details: Mapped[dict] = mapped_column(JSON_TYPE, default=dict)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     user = relationship("User", back_populates="audit_logs")
 

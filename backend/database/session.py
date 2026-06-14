@@ -5,14 +5,9 @@ Async SQLAlchemy session factory with connection pooling
 
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from backend.config import settings
-from backend.database.models import Base
 
 engine = create_async_engine(
     settings.DATABASE_URL,

@@ -4,22 +4,27 @@ Create, manage, pause, resume scans
 """
 
 import uuid
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field, HttpUrl
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user, require_roles
 from backend.database.models import Scan, ScanStatus, Target, User
 from backend.database.session import get_db
-from backend.workers.scan_worker import launch_scan, pause_scan, resume_scan, cancel_scan
+from backend.workers.scan_worker import (
+    cancel_scan,
+    launch_scan,
+    pause_scan,
+    resume_scan,
+)
 
 router = APIRouter()
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
+
 
 class ScanConfig(BaseModel):
     max_depth: int = Field(default=5, ge=1, le=20)
@@ -69,6 +74,7 @@ class ScanListResponse(BaseModel):
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("/", response_model=ScanResponse, status_code=201)
 async def create_scan(
@@ -196,6 +202,7 @@ async def delete_scan(
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 async def _get_or_404(db: AsyncSession, scan_id: uuid.UUID) -> Scan:
     result = await db.execute(select(Scan).where(Scan.id == scan_id))

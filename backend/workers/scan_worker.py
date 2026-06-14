@@ -37,11 +37,14 @@ celery_app.conf.update(
 
 # ── Scan State Keys ────────────────────────────────────────────────────────────
 
+
 def scan_state_key(scan_id: str) -> str:
     return f"paramx:scan:{scan_id}:state"
 
+
 def scan_queue_key(scan_id: str) -> str:
     return f"paramx:scan:{scan_id}:queue"
+
 
 def scan_visited_key(scan_id: str) -> str:
     return f"paramx:scan:{scan_id}:visited"
@@ -49,13 +52,15 @@ def scan_visited_key(scan_id: str) -> str:
 
 # ── Scan Orchestration ─────────────────────────────────────────────────────────
 
+
 async def launch_scan(scan_id: str) -> None:
     """Main scan orchestration coroutine."""
+    from backend.database.models import Scan, ScanStatus
     from backend.database.session import AsyncSessionLocal
-    from backend.database.models import Scan, Endpoint, Parameter, Request, ScanStatus
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import select
+
         result = await db.execute(select(Scan).where(Scan.id == uuid.UUID(scan_id)))
         scan = result.scalar_one_or_none()
         if not scan:
@@ -91,8 +96,10 @@ async def launch_scan(scan_id: str) -> None:
             # Upsert endpoint
             normalized_url = result.url.split("?")[0].split("#")[0]
             if normalized_url not in endpoint_map:
-                from backend.database.models import Endpoint, HttpMethod
                 from urllib.parse import urlparse
+
+                from backend.database.models import Endpoint, HttpMethod
+
                 parsed = urlparse(result.url)
                 ep = Endpoint(
                     scan_id=scan.id,
@@ -130,6 +137,7 @@ async def launch_scan(scan_id: str) -> None:
 
             # Persist new parameters
             from backend.database.models import Parameter
+
             for p in orchestrator.results:
                 sig = p.signature()
                 if sig in param_signatures:
@@ -205,6 +213,7 @@ async def cancel_scan(scan_id: str) -> None:
 
 
 # ── Celery Tasks ───────────────────────────────────────────────────────────────
+
 
 @celery_app.task(name="run_scan", bind=True, max_retries=3)
 def run_scan_task(self, scan_id: str):

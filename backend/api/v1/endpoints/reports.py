@@ -12,19 +12,17 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user
 from backend.config import settings
-from backend.database.models import (
-    Endpoint, Parameter, Scan, Target, User, RiskLevel
-)
+from backend.database.models import Endpoint, Parameter, Scan, User
 from backend.database.session import get_db
 from backend.reporting.generators import (
-    generate_pdf_report,
-    generate_html_report,
     generate_excel_report,
+    generate_html_report,
+    generate_pdf_report,
 )
 
 router = APIRouter()
@@ -34,7 +32,7 @@ os.makedirs(settings.REPORTS_DIR, exist_ok=True)
 
 class ReportRequest(BaseModel):
     scan_id: uuid.UUID
-    format: str = "pdf"   # pdf | html | json | excel
+    format: str = "pdf"  # pdf | html | json | excel
     include_values: bool = False
     include_low_risk: bool = True
     title: str | None = None
@@ -121,9 +119,7 @@ async def quick_json_report(
     )
     params = params_res.scalars().all()
 
-    eps_res = await db.execute(
-        select(Endpoint).where(Endpoint.scan_id == scan_id)
-    )
+    eps_res = await db.execute(select(Endpoint).where(Endpoint.scan_id == scan_id))
     endpoints = eps_res.scalars().all()
 
     report = {
@@ -137,7 +133,9 @@ async def quick_json_report(
             "total_parameters": scan.total_parameters,
             "unique_parameters": scan.unique_parameters,
             "started_at": scan.started_at.isoformat() if scan.started_at else None,
-            "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+            "completed_at": (
+                scan.completed_at.isoformat() if scan.completed_at else None
+            ),
         },
         "summary": {
             "total_endpoints": len(endpoints),
@@ -180,8 +178,12 @@ async def quick_json_report(
     for p in params:
         risk = str(p.risk_level)
         ptype = str(p.param_type)
-        report["summary"]["by_risk"][risk] = report["summary"]["by_risk"].get(risk, 0) + 1
-        report["summary"]["by_type"][ptype] = report["summary"]["by_type"].get(ptype, 0) + 1
+        report["summary"]["by_risk"][risk] = (
+            report["summary"]["by_risk"].get(risk, 0) + 1
+        )
+        report["summary"]["by_type"][ptype] = (
+            report["summary"]["by_type"].get(ptype, 0) + 1
+        )
 
     return StreamingResponse(
         iter([json.dumps(report, indent=2, default=str)]),
@@ -200,15 +202,23 @@ async def _run_report_job(
 ):
     """Background task that builds the report file."""
     from backend.database.session import AsyncSessionLocal
+
     async with AsyncSessionLocal() as db:
         try:
             output_path = str(Path(settings.REPORTS_DIR) / f"{job_id}.{fmt}")
             if fmt == "pdf":
-                await generate_pdf_report(db, scan_id, output_path, title, include_values)
+                await generate_pdf_report(
+                    db, scan_id, output_path, title, include_values
+                )
             elif fmt == "html":
-                await generate_html_report(db, scan_id, output_path, title, include_values)
+                await generate_html_report(
+                    db, scan_id, output_path, title, include_values
+                )
             elif fmt == "excel":
                 await generate_excel_report(db, scan_id, output_path, include_values)
         except Exception as e:
             import structlog
-            structlog.get_logger().error("report_generation_failed", job_id=job_id, error=str(e))
+
+            structlog.get_logger().error(
+                "report_generation_failed", job_id=job_id, error=str(e)
+            )

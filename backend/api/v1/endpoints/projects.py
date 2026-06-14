@@ -3,13 +3,14 @@ ParamX Hunter - Projects API Endpoints
 """
 
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user, require_roles
-from backend.database.models import Project, Target, Scan, User
+from backend.database.models import Project, User
 from backend.database.session import get_db
 
 router = APIRouter()
@@ -61,7 +62,7 @@ async def list_projects(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Project).where(Project.is_active == True).order_by(Project.created_at.desc())
+        select(Project).where(Project.is_active).order_by(Project.created_at.desc())
     )
     projects = result.scalars().all()
     return [_to_response(p) for p in projects]

@@ -16,7 +16,6 @@ from statistics import mean, median
 from backend.core.crawlers import AsyncCrawler, CrawlConfig
 from backend.core.extractors import ExtractionOrchestrator
 
-
 # ── Extraction Engine Benchmark ────────────────────────────────────────────────
 
 SAMPLE_URL = "https://example.com/api/v1/search?q=test&page=2&limit=50&sort=created_at&ref=homepage"
@@ -26,16 +25,26 @@ SAMPLE_HEADERS = {
     "X-Api-Key": "sk-live-abc123def456",
     "X-Request-Id": "req-abc-123",
 }
-SAMPLE_COOKIES = {"sessionid": "sess_abc123xyz", "theme": "dark", "csrftoken": "tok_xyz"}
-SAMPLE_BODY = json.dumps({
-    "username": "admin",
-    "password": "supersecret",
-    "profile": {
-        "name": "Test User",
-        "settings": {"locale": "en-US", "debug": True, "feature_flags": ["new_ui", "beta_api"]}
-    },
-    "items": [{"id": 1, "qty": 2}, {"id": 2, "qty": 1}],
-})
+SAMPLE_COOKIES = {
+    "sessionid": "sess_abc123xyz",
+    "theme": "dark",
+    "csrftoken": "tok_xyz",
+}
+SAMPLE_BODY = json.dumps(
+    {
+        "username": "admin",
+        "password": "supersecret",
+        "profile": {
+            "name": "Test User",
+            "settings": {
+                "locale": "en-US",
+                "debug": True,
+                "feature_flags": ["new_ui", "beta_api"],
+            },
+        },
+        "items": [{"id": 1, "qty": 2}, {"id": 2, "qty": 1}],
+    }
+)
 SAMPLE_HTML = """
 <form action="/login" method="POST">
   <input type="hidden" name="_csrf" value="tok_abc123">
@@ -79,6 +88,7 @@ def benchmark_extraction(iterations: int = 10_000) -> dict:
 
 # ── Crawler Throughput Benchmark ───────────────────────────────────────────────
 
+
 async def benchmark_crawler(target_url: str, duration_seconds: int = 30) -> dict:
     """
     Run a real crawl against a target for `duration_seconds` and report
@@ -120,7 +130,9 @@ async def benchmark_crawler(target_url: str, duration_seconds: int = 30) -> dict
         "duration_seconds": round(elapsed, 1),
         "total_requests": count,
         "requests_per_second": round(count / elapsed, 1) if elapsed > 0 else 0,
-        "extrapolated_requests_per_hour": round((count / elapsed) * 3600, 0) if elapsed > 0 else 0,
+        "extrapolated_requests_per_hour": (
+            round((count / elapsed) * 3600, 0) if elapsed > 0 else 0
+        ),
         "target_met": (count / elapsed) * 3600 >= 100_000 if elapsed > 0 else False,
         "crawler_stats": crawler.get_stats(),
     }
@@ -128,11 +140,18 @@ async def benchmark_crawler(target_url: str, duration_seconds: int = 30) -> dict
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(description="ParamX Hunter performance benchmarks")
-    parser.add_argument("--target", help="Target URL for crawl benchmark (authorized only)")
-    parser.add_argument("--duration", type=int, default=30, help="Crawl benchmark duration (seconds)")
-    parser.add_argument("--iterations", type=int, default=10_000, help="Extraction benchmark iterations")
+    parser.add_argument(
+        "--target", help="Target URL for crawl benchmark (authorized only)"
+    )
+    parser.add_argument(
+        "--duration", type=int, default=30, help="Crawl benchmark duration (seconds)"
+    )
+    parser.add_argument(
+        "--iterations", type=int, default=10_000, help="Extraction benchmark iterations"
+    )
     args = parser.parse_args()
 
     print("=" * 60)
@@ -153,7 +172,9 @@ def main():
         for k, v in crawl_results.items():
             if k != "crawler_stats":
                 print(f"  {k:35s}: {v}")
-        print(f"\n  Target (100k req/hr): {'✅ MET' if crawl_results['target_met'] else '❌ NOT MET (network/server bound)'}")
+        print(
+            f"\n  Target (100k req/hr): {'✅ MET' if crawl_results['target_met'] else '❌ NOT MET (network/server bound)'}"
+        )
 
 
 if __name__ == "__main__":

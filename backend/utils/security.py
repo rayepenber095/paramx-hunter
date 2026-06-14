@@ -5,16 +5,14 @@ and secrets management helpers.
 """
 
 import base64
-import json
-import os
 from functools import lru_cache
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from backend.config import settings
 
-
 # ── Encryption at Rest ──────────────────────────────────────────────────────────
+
 
 @lru_cache(maxsize=1)
 def _get_fernet() -> Fernet:
@@ -75,7 +73,13 @@ def decrypt_dict_values(data: dict) -> dict:
 
 
 SENSITIVE_KEY_PATTERNS = {
-    "password", "secret", "token", "key", "credential", "auth", "session",
+    "password",
+    "secret",
+    "token",
+    "key",
+    "credential",
+    "auth",
+    "session",
 }
 
 
@@ -92,13 +96,16 @@ def mask_sensitive_value(name: str, value: str | None) -> str | None:
 
 # ── Secrets Generation ─────────────────────────────────────────────────────────
 
+
 def generate_secret_key(length: int = 32) -> str:
     """Generate a cryptographically secure random secret key."""
     import secrets
+
     return secrets.token_urlsafe(length)
 
 
 def generate_api_key(prefix: str = "px") -> str:
     """Generate a ParamX Hunter API key (for programmatic access)."""
     import secrets
+
     return f"{prefix}_{secrets.token_hex(24)}"

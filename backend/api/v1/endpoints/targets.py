@@ -3,13 +3,14 @@ ParamX Hunter - Targets API Endpoints
 """
 
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user, require_roles
-from backend.database.models import Target, Project, User
+from backend.database.models import Project, Target, User
 from backend.database.session import get_db
 
 router = APIRouter()
@@ -43,6 +44,7 @@ class TargetResponse(BaseModel):
 
 def _extract_domain(url: str) -> str:
     from urllib.parse import urlparse
+
     return urlparse(url).netloc
 
 
@@ -123,7 +125,9 @@ def _to_response(t: Target) -> TargetResponse:
         excluded_urls=t.excluded_urls or [],
         headers=t.headers or {},
         cookies=t.cookies or {},
-        auth_config={k: "***" if "key" in k.lower() or "secret" in k.lower() else v
-                     for k, v in (t.auth_config or {}).items()},
+        auth_config={
+            k: "***" if "key" in k.lower() or "secret" in k.lower() else v
+            for k, v in (t.auth_config or {}).items()
+        },
         created_at=t.created_at.isoformat(),
     )

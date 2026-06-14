@@ -6,33 +6,30 @@ import time
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, make_asgi_app
 
 from backend.api.v1 import router as api_v1_router
-from backend.database.session import engine
 from backend.config import settings
+from backend.database.session import engine
 
 logger = structlog.get_logger(__name__)
 
 # ── Metrics ────────────────────────────────────────────────────────────────────
 
 REQUEST_COUNT = Counter(
-    "paramx_http_requests_total",
-    "Total HTTP requests",
-    ["method", "path", "status"]
+    "paramx_http_requests_total", "Total HTTP requests", ["method", "path", "status"]
 )
 REQUEST_LATENCY = Histogram(
-    "paramx_http_request_duration_seconds",
-    "HTTP request duration",
-    ["method", "path"]
+    "paramx_http_request_duration_seconds", "HTTP request duration", ["method", "path"]
 )
 
 
 # ── Lifespan ───────────────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,6 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 # ── App Factory ────────────────────────────────────────────────────────────────
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -102,16 +100,14 @@ def create_app() -> FastAPI:
     @app.exception_handler(404)
     async def not_found_handler(request: Request, exc):
         return JSONResponse(
-            status_code=404,
-            content={"detail": "Not found", "path": request.url.path}
+            status_code=404, content={"detail": "Not found", "path": request.url.path}
         )
 
     @app.exception_handler(500)
     async def server_error_handler(request: Request, exc):
         logger.error("unhandled_exception", error=str(exc))
         return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error"}
+            status_code=500, content={"detail": "Internal server error"}
         )
 
     # ── Routes ─────────────────────────────────────────────────────────────────

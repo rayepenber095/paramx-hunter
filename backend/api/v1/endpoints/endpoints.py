@@ -3,9 +3,10 @@ ParamX Hunter - Endpoints API
 """
 
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.dependencies import get_current_user
@@ -82,7 +83,11 @@ async def list_endpoints(
     stmt = select(Endpoint)
     if conditions:
         stmt = stmt.where(and_(*conditions))
-    stmt = stmt.order_by(Endpoint.first_seen.desc()).offset((page - 1) * per_page).limit(per_page)
+    stmt = (
+        stmt.order_by(Endpoint.first_seen.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
     result = await db.execute(stmt)
     endpoints = result.scalars().all()
 
@@ -136,12 +141,23 @@ async def get_endpoint(
     param_count = count_res.scalar_one()
 
     return EndpointResponse(
-        id=ep.id, scan_id=ep.scan_id, url=ep.url, normalized_url=ep.normalized_url,
-        path=ep.path, domain=ep.domain, method=str(ep.method),
-        status_code=ep.status_code, content_type=ep.content_type,
-        response_size=ep.response_size, response_time_ms=ep.response_time_ms,
-        is_api=ep.is_api, is_graphql=ep.is_graphql, is_websocket=ep.is_websocket,
-        framework_detected=ep.framework_detected, tags=ep.tags or [],
+        id=ep.id,
+        scan_id=ep.scan_id,
+        url=ep.url,
+        normalized_url=ep.normalized_url,
+        path=ep.path,
+        domain=ep.domain,
+        method=str(ep.method),
+        status_code=ep.status_code,
+        content_type=ep.content_type,
+        response_size=ep.response_size,
+        response_time_ms=ep.response_time_ms,
+        is_api=ep.is_api,
+        is_graphql=ep.is_graphql,
+        is_websocket=ep.is_websocket,
+        framework_detected=ep.framework_detected,
+        tags=ep.tags or [],
         parameter_count=param_count,
-        first_seen=ep.first_seen.isoformat(), last_seen=ep.last_seen.isoformat(),
+        first_seen=ep.first_seen.isoformat(),
+        last_seen=ep.last_seen.isoformat(),
     )

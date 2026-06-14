@@ -31,6 +31,7 @@ def get_redis() -> aioredis.Redis:
 
 # ── Per-Domain Rate Limiter ─────────────────────────────────────────────────────
 
+
 class DomainRateLimiter:
     """
     Token-bucket rate limiter scoped per target domain.
@@ -47,10 +48,13 @@ class DomainRateLimiter:
     async def acquire(self, domain: str) -> None:
         """Block until a token is available for this domain."""
         async with self._lock:
-            bucket = self._buckets.setdefault(domain, {
-                "tokens": float(self.burst),
-                "last_refill": time.monotonic(),
-            })
+            bucket = self._buckets.setdefault(
+                domain,
+                {
+                    "tokens": float(self.burst),
+                    "last_refill": time.monotonic(),
+                },
+            )
 
             now = time.monotonic()
             elapsed = now - bucket["last_refill"]
@@ -81,6 +85,7 @@ class DomainRateLimiter:
 
 # ── Distributed Rate Limiter (Redis-backed, for multi-worker scans) ───────────
 
+
 class RedisRateLimiter:
     """
     Sliding-window rate limiter using Redis, for coordinating rate limits
@@ -90,7 +95,9 @@ class RedisRateLimiter:
     def __init__(self, key_prefix: str = "paramx:ratelimit"):
         self.key_prefix = key_prefix
 
-    async def is_allowed(self, identifier: str, max_requests: int, window_seconds: int) -> bool:
+    async def is_allowed(
+        self, identifier: str, max_requests: int, window_seconds: int
+    ) -> bool:
         r = get_redis()
         key = f"{self.key_prefix}:{identifier}"
         now = time.time()
@@ -106,12 +113,15 @@ class RedisRateLimiter:
         current_count = results[1]
         return current_count < max_requests
 
-    async def wait_if_needed(self, identifier: str, max_requests: int, window_seconds: int) -> None:
+    async def wait_if_needed(
+        self, identifier: str, max_requests: int, window_seconds: int
+    ) -> None:
         while not await self.is_allowed(identifier, max_requests, window_seconds):
             await asyncio.sleep(0.5)
 
 
 # ── Response Caching ───────────────────────────────────────────────────────────
+
 
 def cache_key(*parts: Any) -> str:
     raw = json.dumps(parts, sort_keys=True, default=str)
@@ -139,6 +149,7 @@ async def cached_set(key: str, value: Any, ttl: int | None = None) -> None:
 
 def cached(ttl: int | None = None):
     """Decorator for caching async function results in Redis."""
+
     def decorator(fn: Callable):
         @wraps(fn)
         async def wrapper(*args, **kwargs):
@@ -149,11 +160,14 @@ def cached(ttl: int | None = None):
             result = await fn(*args, **kwargs)
             await cached_set(key, result, ttl)
             return result
+
         return wrapper
+
     return decorator
 
 
 # ── Crawl Deduplication (Bloom-filter-like via Redis Set) ──────────────────────
+
 
 class URLDeduplicator:
     """

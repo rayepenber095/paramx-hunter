@@ -6,7 +6,6 @@ and reconstructs message schemas over the lifetime of a connection.
 
 import json
 import re
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -30,6 +29,7 @@ class WSMessage:
 @dataclass
 class WSSchema:
     """Inferred JSON schema for a message 'type' / channel."""
+
     message_type: str
     fields: dict[str, str] = field(default_factory=dict)  # field_name -> inferred type
     sample_count: int = 0
@@ -79,7 +79,9 @@ class WebSocketAnalyzer:
                 try:
                     async with asyncio.timeout(duration_seconds):
                         async for raw in ws:
-                            self._record("receive", raw if isinstance(raw, str) else raw.decode())
+                            self._record(
+                                "receive", raw if isinstance(raw, str) else raw.decode()
+                            )
                 except (asyncio.TimeoutError, TimeoutError):
                     pass
 
@@ -112,12 +114,17 @@ class WebSocketAnalyzer:
     def _update_schema(self, data: dict) -> None:
         """Infer/update schema based on a message's 'type'/'event'/'action' field."""
         msg_type = (
-            data.get("type") or data.get("event") or
-            data.get("action") or data.get("op") or "unknown"
+            data.get("type")
+            or data.get("event")
+            or data.get("action")
+            or data.get("op")
+            or "unknown"
         )
         msg_type = str(msg_type)
 
-        schema = self.schemas.setdefault(msg_type, WSSchema(message_type=msg_type, example=data))
+        schema = self.schemas.setdefault(
+            msg_type, WSSchema(message_type=msg_type, example=data)
+        )
         schema.sample_count += 1
 
         for key, value in data.items():
@@ -168,6 +175,7 @@ class WebSocketAnalyzer:
 
 
 # ── SSE (Server-Sent Events) Analyzer ──────────────────────────────────────────
+
 
 class SSEAnalyzer:
     """

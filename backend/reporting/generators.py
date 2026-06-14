@@ -3,31 +3,30 @@ ParamX Hunter - Report Generators
 PDF (ReportLab), HTML (Jinja2), Excel (openpyxl)
 """
 
-import os
 from datetime import datetime
 from pathlib import Path
 
-from jinja2 import Environment, BaseLoader
+from jinja2 import BaseLoader, Environment
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models import Endpoint, Parameter, Scan
 
-
 # ── Data Loader ────────────────────────────────────────────────────────────────
+
 
 async def _load_scan_data(db: AsyncSession, scan_id: str) -> dict:
     scan_res = await db.execute(select(Scan).where(Scan.id == scan_id))
     scan = scan_res.scalar_one_or_none()
 
     params_res = await db.execute(
-        select(Parameter).where(Parameter.scan_id == scan_id).order_by(Parameter.risk_level)
+        select(Parameter)
+        .where(Parameter.scan_id == scan_id)
+        .order_by(Parameter.risk_level)
     )
     params = params_res.scalars().all()
 
-    eps_res = await db.execute(
-        select(Endpoint).where(Endpoint.scan_id == scan_id)
-    )
+    eps_res = await db.execute(select(Endpoint).where(Endpoint.scan_id == scan_id))
     endpoints = eps_res.scalars().all()
 
     by_risk: dict[str, int] = {}
@@ -182,6 +181,7 @@ async def generate_html_report(
 
 # ── PDF Report ─────────────────────────────────────────────────────────────────
 
+
 async def generate_pdf_report(
     db: AsyncSession,
     scan_id: str,
@@ -192,42 +192,60 @@ async def generate_pdf_report(
     """Generate PDF via ReportLab."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
     from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        HRFlowable,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
     )
 
     data = await _load_scan_data(db, scan_id)
     scan = data["scan"]
     params = data["parameters"]
-    endpoints = data["endpoints"]
     summary = data["summary"]
 
-    doc = SimpleDocTemplate(output_path, pagesize=A4,
-                            leftMargin=2*cm, rightMargin=2*cm,
-                            topMargin=2*cm, bottomMargin=2*cm)
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
     styles = getSampleStyleSheet()
     mono = ParagraphStyle("mono", fontName="Courier", fontSize=8, leading=10)
-    title_style = ParagraphStyle("title", fontSize=22, textColor=colors.HexColor("#06b6d4"),
-                                 fontName="Helvetica-Bold", spaceAfter=4)
-    h2_style = ParagraphStyle("h2", fontSize=13, textColor=colors.HexColor("#94a3b8"),
-                               fontName="Helvetica-Bold", spaceBefore=18, spaceAfter=8)
-
-    RISK_COLORS = {
-        "critical": colors.HexColor("#ef4444"),
-        "high": colors.HexColor("#f97316"),
-        "medium": colors.HexColor("#fbbf24"),
-        "low": colors.HexColor("#34d399"),
-        "info": colors.HexColor("#60a5fa"),
-    }
+    title_style = ParagraphStyle(
+        "title",
+        fontSize=22,
+        textColor=colors.HexColor("#06b6d4"),
+        fontName="Helvetica-Bold",
+        spaceAfter=4,
+    )
+    h2_style = ParagraphStyle(
+        "h2",
+        fontSize=13,
+        textColor=colors.HexColor("#94a3b8"),
+        fontName="Helvetica-Bold",
+        spaceBefore=18,
+        spaceAfter=8,
+    )
 
     story = []
     story.append(Paragraph("⚡ ParamX Hunter", title_style))
-    story.append(Paragraph(f"Scan: <b>{scan.name}</b> — {data['generated_at']}", styles["Normal"]))
-    story.append(Spacer(1, 0.5*cm))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1e2a3a")))
-    story.append(Spacer(1, 0.3*cm))
+    story.append(
+        Paragraph(
+            f"Scan: <b>{scan.name}</b> — {data['generated_at']}", styles["Normal"]
+        )
+    )
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(
+        HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1e2a3a"))
+    )
+    story.append(Spacer(1, 0.3 * cm))
 
     # Summary table
     sum_data = [
@@ -239,24 +257,28 @@ async def generate_pdf_report(
             str(summary["critical"]),
             str(summary["high"]),
             str(summary["apis"]),
-        ]
+        ],
     ]
-    sum_table = Table(sum_data, colWidths=[2.8*cm]*6)
-    sum_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#07101c")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#64748b")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("FONTNAME", (0, 1), (-1, 1), "Courier-Bold"),
-        ("TEXTCOLOR", (0, 1), (-1, 1), colors.HexColor("#06b6d4")),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#1e2a3a")),
-        ("ROWBACKGROUNDS", (0, 1), (-1, 1), [colors.HexColor("#0d1520")]),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-    ]))
+    sum_table = Table(sum_data, colWidths=[2.8 * cm] * 6)
+    sum_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#07101c")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#64748b")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("FONTNAME", (0, 1), (-1, 1), "Courier-Bold"),
+                ("TEXTCOLOR", (0, 1), (-1, 1), colors.HexColor("#06b6d4")),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#1e2a3a")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, 1), [colors.HexColor("#0d1520")]),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
     story.append(sum_table)
-    story.append(Spacer(1, 0.5*cm))
+    story.append(Spacer(1, 0.5 * cm))
 
     # Parameters table
     story.append(Paragraph("Parameters", h2_style))
@@ -267,31 +289,43 @@ async def generate_pdf_report(
             flags.append("sensitive")
         if p.is_hidden:
             flags.append("hidden")
-        p_rows.append([
-            Paragraph(p.name[:50], mono),
-            Paragraph(str(p.param_type).replace("_", " "), mono),
-            Paragraph(p.source, mono),
-            Paragraph(str(p.risk_level).upper(), mono),
-            Paragraph(", ".join(flags), mono),
-        ])
+        p_rows.append(
+            [
+                Paragraph(p.name[:50], mono),
+                Paragraph(str(p.param_type).replace("_", " "), mono),
+                Paragraph(p.source, mono),
+                Paragraph(str(p.risk_level).upper(), mono),
+                Paragraph(", ".join(flags), mono),
+            ]
+        )
 
-    p_table = Table(p_rows, colWidths=[4.5*cm, 3*cm, 3*cm, 2*cm, 2.5*cm])
-    p_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#07101c")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#64748b")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 7),
-        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#1e2a3a")),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#050e1a"), colors.HexColor("#0d1520")]),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    p_table = Table(p_rows, colWidths=[4.5 * cm, 3 * cm, 3 * cm, 2 * cm, 2.5 * cm])
+    p_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#07101c")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#64748b")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 7),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#1e2a3a")),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.HexColor("#050e1a"), colors.HexColor("#0d1520")],
+                ),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(p_table)
 
     doc.build(story)
 
 
 # ── Excel Report ───────────────────────────────────────────────────────────────
+
 
 async def generate_excel_report(
     db: AsyncSession,
@@ -301,7 +335,7 @@ async def generate_excel_report(
 ) -> None:
     """Generate Excel report with multiple sheets."""
     import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
     data = await _load_scan_data(db, scan_id)
@@ -309,15 +343,7 @@ async def generate_excel_report(
 
     HDR_FILL = PatternFill("solid", fgColor="07101C")
     HDR_FONT = Font(color="64748B", bold=True, name="Consolas", size=9)
-    CYAN_FONT = Font(color="06B6D4", name="Consolas", size=9)
     MONO_FONT = Font(name="Consolas", size=9)
-    RISK_FILLS = {
-        "critical": PatternFill("solid", fgColor="1A0505"),
-        "high": PatternFill("solid", fgColor="1A0A05"),
-        "medium": PatternFill("solid", fgColor="1A1505"),
-        "low": PatternFill("solid", fgColor="051A0A"),
-        "info": PatternFill("solid", fgColor="050A1A"),
-    }
 
     def add_sheet(name: str, headers: list[str], rows: list[list]) -> None:
         ws = wb.create_sheet(name)
@@ -353,29 +379,62 @@ async def generate_excel_report(
         ws_sum.append(row_data)
 
     # Parameters sheet
-    param_headers = ["Name", "Type", "Source", "Method", "Risk Level",
-                     "Sensitive", "Hidden", "Frequency", "Risk Tags", "First Seen"]
+    param_headers = [
+        "Name",
+        "Type",
+        "Source",
+        "Method",
+        "Risk Level",
+        "Sensitive",
+        "Hidden",
+        "Frequency",
+        "Risk Tags",
+        "First Seen",
+    ]
     if include_values:
         param_headers.insert(1, "Value")
 
     param_rows = []
     for p in data["parameters"]:
-        row = [p.name, str(p.param_type), p.source, str(p.method or ""),
-               str(p.risk_level), str(p.is_sensitive), str(p.is_hidden),
-               p.frequency, ", ".join(p.risk_tags or []),
-               p.first_seen.strftime("%Y-%m-%d %H:%M")]
+        row = [
+            p.name,
+            str(p.param_type),
+            p.source,
+            str(p.method or ""),
+            str(p.risk_level),
+            str(p.is_sensitive),
+            str(p.is_hidden),
+            p.frequency,
+            ", ".join(p.risk_tags or []),
+            p.first_seen.strftime("%Y-%m-%d %H:%M"),
+        ]
         if include_values:
             row.insert(1, (p.value or "")[:200])
         param_rows.append(row)
     add_sheet("Parameters", param_headers, param_rows)
 
     # Endpoints sheet
-    ep_headers = ["URL", "Method", "Status", "Is API", "Is GraphQL",
-                  "Is WebSocket", "Framework", "First Seen"]
+    ep_headers = [
+        "URL",
+        "Method",
+        "Status",
+        "Is API",
+        "Is GraphQL",
+        "Is WebSocket",
+        "Framework",
+        "First Seen",
+    ]
     ep_rows = [
-        [ep.url, str(ep.method), str(ep.status_code or ""), str(ep.is_api),
-         str(ep.is_graphql), str(ep.is_websocket), ep.framework_detected or "",
-         ep.first_seen.strftime("%Y-%m-%d %H:%M")]
+        [
+            ep.url,
+            str(ep.method),
+            str(ep.status_code or ""),
+            str(ep.is_api),
+            str(ep.is_graphql),
+            str(ep.is_websocket),
+            ep.framework_detected or "",
+            ep.first_seen.strftime("%Y-%m-%d %H:%M"),
+        ]
         for ep in data["endpoints"]
     ]
     add_sheet("Endpoints", ep_headers, ep_rows)
