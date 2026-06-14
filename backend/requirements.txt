@@ -1,0 +1,74 @@
+# ParamX Hunter - Backend Dependencies
+# Python 3.13+
+
+# ── Core Framework ────────────────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+gunicorn==23.0.0
+python-multipart==0.0.17
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# ── Caching & Task Queue ──────────────────────────────────────────────────────
+redis[hiredis]==5.2.1
+celery[redis]==5.4.0
+kombu==5.4.2
+
+# ── HTTP Crawling & Networking ────────────────────────────────────────────────
+aiohttp[speedups]==3.11.10
+httpx[http2]==0.28.1
+playwright==1.49.0
+beautifulsoup4==4.12.3
+lxml==5.3.0
+cssselect==1.2.0
+urllib3==2.2.3
+
+# ── Data Validation & Serialization ──────────────────────────────────────────
+pydantic==2.10.3
+pydantic-settings==2.7.0
+pydantic[email]==2.10.3
+
+# ── Authentication & Security ─────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==44.0.0
+python-dotenv==1.0.1
+
+# ── Parameter Parsing ─────────────────────────────────────────────────────────
+PyYAML==6.0.2
+xmltodict==0.14.2
+defusedxml==0.7.1
+graphql-core==3.2.5
+grpcio==1.68.1
+protobuf==5.29.1
+websockets==14.1
+
+# ── Reporting ─────────────────────────────────────────────────────────────────
+reportlab==4.2.5
+weasyprint==63.1
+jinja2==3.1.4
+openpyxl==3.1.5
+pandas==2.2.3
+
+# ── Observability ─────────────────────────────────────────────────────────────
+structlog==24.4.0
+prometheus-client==0.21.1
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+
+# ── Dev & Testing ─────────────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+httpx==0.28.1
+factory-boy==3.3.1
+faker==33.1.0
+black==24.10.0
+isort==5.13.2
+mypy==1.13.0
+ruff==0.8.4

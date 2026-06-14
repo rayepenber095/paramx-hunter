@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paramx-celery-worker
+  namespace: paramx-hunter
+  labels:
+    app: paramx-celery-worker
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: paramx-celery-worker
+  template:
+    metadata:
+      labels:
+        app: paramx-celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: paramx-hunter/backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["celery", "-A", "backend.workers.scan_worker.celery_app", "worker",
+                    "--loglevel=info", "--concurrency=8", "--max-tasks-per-child=50"]
+          envFrom:
+            - configMapRef: { name: paramx-config }
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: paramx-secrets, key: SECRET_KEY }
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits:   { cpu: "2",    memory: "2Gi" }
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: paramx-celery-worker-hpa
+  namespace: paramx-hunter
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: paramx-celery-worker
+  minReplicas: 4
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paramx-celery-beat
+  namespace: paramx-hunter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paramx-celery-beat
+  template:
+    metadata:
+      labels:
+        app: paramx-celery-beat
+    spec:
+      containers:
+        - name: celery-beat
+          image: paramx-hunter/backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["celery", "-A", "backend.workers.scan_worker.celery_app", "beat", "--loglevel=info"]
+          envFrom:
+            - configMapRef: { name: paramx-config }
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: paramx-secrets, key: SECRET_KEY }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }

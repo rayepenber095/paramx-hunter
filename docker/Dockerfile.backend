@@ -1,0 +1,71 @@
+# ParamX Hunter - Backend Dockerfile
+# Multi-stage build for production-grade Python 3.13 FastAPI app
+
+FROM python:3.13-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# System dependencies (for lxml, weasyprint, playwright/chromium)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libxml2-dev \
+    libxslt1-dev \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz-subset0 \
+    fonts-liberation \
+    fonts-unifont \
+    curl \
+    # Chromium runtime libraries (Playwright --with-deps fails on trixie,
+    # so the required libs are installed explicitly here instead)
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libxkbcommon0 \
+    libasound2 \
+    libatspi2.0-0 \
+    libx11-6 \
+    libxcb1 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Dependencies ────────────────────────────────────────────────────────────────
+FROM base AS deps
+
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright's Chromium browser binary only.
+# --with-deps is skipped: it tries an Ubuntu 20.04 apt fallback on Debian
+# trixie (python:3.13-slim) and fails on renamed packages (ttf-unifont,
+# ttf-ubuntu-font-family). All required system libs are installed above instead.
+RUN playwright install chromium
+
+# ── Final image ───────────────────────────────────────────────────────────────
+FROM deps AS final
+
+COPY backend/ ./backend/
+COPY alembic.ini .
+
+RUN mkdir -p /tmp/paramx_reports
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
